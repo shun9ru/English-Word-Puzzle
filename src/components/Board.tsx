@@ -9,6 +9,8 @@ interface BoardProps {
   board: Cell[][];
   onCellClick: (x: number, y: number) => void;
   onDropTile?: (x: number, y: number, data: string) => void;
+  /** CPU が直前に置いたセル（ハイライト用） */
+  cpuHighlightCells?: { x: number; y: number }[];
 }
 
 function multiplierLabel(m: Cell["multiplier"]): string {
@@ -21,8 +23,12 @@ function multiplierLabel(m: Cell["multiplier"]): string {
   }
 }
 
-export function Board({ board, onCellClick, onDropTile }: BoardProps) {
+export function Board({ board, onCellClick, onDropTile, cpuHighlightCells }: BoardProps) {
   const size = board.length;
+
+  const cpuSet = new Set(
+    (cpuHighlightCells ?? []).map((c) => `${c.x},${c.y}`)
+  );
 
   return (
     <div
@@ -36,8 +42,8 @@ export function Board({ board, onCellClick, onDropTile }: BoardProps) {
         row.map((cell, x) => {
           const char = cell.pending ?? cell.char;
           const isPending = cell.pending !== null;
-          const isFree = isPending && cell.pending !== null;
           const mLabel = multiplierLabel(cell.multiplier);
+          const isCpuPlaced = cpuSet.has(`${x},${y}`);
 
           return (
             <div
@@ -47,7 +53,7 @@ export function Board({ board, onCellClick, onDropTile }: BoardProps) {
                 isPending ? "cell--pending" : "",
                 cell.char ? "cell--confirmed" : "",
                 cell.multiplier !== "NONE" && !char ? `cell--${cell.multiplier.toLowerCase()}` : "",
-                isPending && isFree ? "" : "",
+                isCpuPlaced ? "cell--cpu-placed" : "",
               ]
                 .filter(Boolean)
                 .join(" ")}

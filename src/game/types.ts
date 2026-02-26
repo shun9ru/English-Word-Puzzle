@@ -65,7 +65,9 @@ export type SpecialEffectType =
   | "draw_normal"      // ノーマルカード追加ドロー
   | "recover_free"     // フリーカード回復
   | "upgrade_bonus"    // ボーナスマスアップグレード
-  | "next_turn_mult";  // 次ターンスコア倍率
+  | "next_turn_mult"      // 次ターンスコア倍率
+  | "reduce_opponent"     // 相手スコア減少（バトル専用）
+  | "force_letter_count"; // 相手の次ターン使用タイル数制限（バトル専用）
 
 /** スペシャルカード定義 */
 export interface SpecialCardDef {
@@ -82,6 +84,8 @@ export interface SpecialCardDef {
   effectValue: number;
   /** 単語を表す絵文字アイコン */
   icon: string;
+  /** バトル専用カード（ソロモードではデッキに入らない） */
+  battleOnly?: boolean;
 }
 
 /** スペシャルカードインスタンス */
@@ -110,6 +114,43 @@ export interface DictEntry {
 export interface SpellHistoryEntry {
   query: string;
   results: DictEntry[];
+}
+
+/** ゲームモード */
+export type GameMode = "solo" | "battle";
+
+/** ターン所有者 */
+export type TurnOwner = "player" | "cpu";
+
+/** CPU の着手候補 */
+export interface CpuCandidate {
+  placements: Placement[];
+  score: number;
+  words: { word: string; points: number }[];
+}
+
+/** 対戦モード用の状態 */
+export interface BattleState {
+  mode: "battle";
+  turnOwner: TurnOwner;
+  /** CPU のラック（非公開） */
+  cpuRack: string[];
+  /** CPU の累計スコア */
+  cpuScore: number;
+  /** CPU の単語履歴 */
+  cpuWordHistory: string[];
+  /** 進行カウンタ（偶数=プレイヤー、奇数=CPU） */
+  battleTurn: number;
+  /** 直前の CPU 着手結果（表示用） */
+  lastCpuMove: {
+    words: { word: string; points: number }[];
+    totalScore: number;
+    passed: boolean;
+  } | null;
+  /** CPU が直前に置いたセル座標（ハイライト用） */
+  cpuHighlightCells: { x: number; y: number }[];
+  /** CPUの次ターンで使用すべきラックタイル数（null=制限なし） */
+  cpuLetterLimit: number | null;
 }
 
 /** ゲーム全体の状態 */

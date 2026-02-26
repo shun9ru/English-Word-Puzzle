@@ -71,6 +71,18 @@
   box-shadow: inset 0 0 0 2px #1565c0;
 }
 
+/* CPU が置いたタイルのハイライト */
+.cell--cpu-placed {
+  background: #fff3e0;
+  box-shadow: inset 0 0 0 2px #ff9800;
+  animation: cpu-place-flash 1.5s ease-out;
+}
+
+@keyframes cpu-place-flash {
+  0% { background: #ffcc80; }
+  100% { background: #fff3e0; }
+}
+
 @media (max-width: 600px) {
   .board {
     max-width: min(95vw, 52vh);

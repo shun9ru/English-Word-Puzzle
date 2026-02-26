@@ -3,7 +3,9 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import type { GameState, Category, Placement, DictEntry, SpecialCard, SpellHistoryEntry } from "../game/types";
+import type { GameState, GameMode, Category, Placement, DictEntry, SpecialCard, SpellHistoryEntry, BattleState } from "../game/types";
+import { findBestMove } from "../game/cpu/cpuAI";
+import { applyCpuMove, applyCpuPass } from "../game/cpu/applyCpuMove";
 import { loadDictionary } from "../game/dictionary";
 import { loadBoardLayout } from "../game/boardLayout";
 import { createEmptyBoard, cloneBoard, createFreePool } from "../game/core/helpers";
@@ -90,6 +92,12 @@ export default function App() {
   const [showSpellCheck, setShowSpellCheck] = useState(false);
   const [spellHistory, setSpellHistory] = useState<SpellHistoryEntry[]>([]);
 
+  // バトルモード
+  const [gameMode, setGameMode] = useState<GameMode>("solo");
+  const [battleState, setBattleState] = useState<BattleState | null>(null);
+  const [cpuThinking, setCpuThinking] = useState(false);
+  const cpuTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // タイマー
   const [timeRemaining, setTimeRemaining] = useState(TURN_TIME);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -145,9 +153,9 @@ export default function App() {
     }
   }, []);
 
-  // タイマー切れ → 自動パス
+  // タイマー切れ → 自動パス（CPU思考中は無視）
   useEffect(() => {
-    if (timeRemaining <= 0 && gameState && !gameState.finished && screen === "game") {
+    if (timeRemaining <= 0 && gameState && !gameState.finished && screen === "game" && !cpuThinking) {
       handlePassInternal();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -163,6 +171,7 @@ export default function App() {
   // タイトルに戻る
   const returnToTitle = useCallback(() => {
     stopTimer();
+    if (cpuTimerRef.current) { clearTimeout(cpuTimerRef.current); cpuTimerRef.current = null; }
     setScreen("title");
     setGameState(null);
     setDict(null);
@@ -171,6 +180,8 @@ export default function App() {
     setSelectedRackIndex(null);
     setSelectedFreeLetter(null);
     setSpellHistory([]);
+    setBattleState(null);
+    setCpuThinking(false);
   }, [stopTimer]);
 
   // ゲーム開始
@@ -189,16 +200,28 @@ export default function App() {
       const bag = generateBag();
       const [initialRack, remainingBag] = drawTiles(bag, RACK_SIZE);
 
-      // DBからデッキ読み込み
+      const isBattle = gameMode === "battle";
+
+      // バトルモード: CPUラックもバッグからドロー
+      let finalBag = remainingBag;
+      let cpuInitialRack: string[] = [];
+      if (isBattle) {
+        const [cpuRack, bagAfterCpu] = drawTiles(remainingBag, RACK_SIZE);
+        cpuInitialRack = cpuRack;
+        finalBag = bagAfterCpu;
+      }
+
+      // スペシャルカード読み込み（ソロモードではバトル専用カードを除外）
       const playerDeck = await loadDeckFromDB(userId, selectedCategory);
-      const gameDeck = prepareGameDeck(playerDeck);
+      const allDeck = prepareGameDeck(playerDeck);
+      const gameDeck = isBattle ? allDeck : allDeck.filter((c) => !c.battleOnly);
       const initialSpecialHand = gameDeck.slice(0, Math.min(4, gameDeck.length));
       const remainingDeck = gameDeck.slice(initialSpecialHand.length);
 
       const state: GameState = {
         board: createEmptyBoard(layout),
         rack: initialRack,
-        bag: remainingBag,
+        bag: finalBag,
         placedThisTurn: [],
         score: 0,
         turn: 0,
@@ -222,6 +245,23 @@ export default function App() {
       setSelectedRackIndex(null);
       setSelectedFreeLetter(null);
       setSpellHistory([]);
+
+      if (isBattle) {
+        setBattleState({
+          mode: "battle",
+          turnOwner: "player",
+          cpuRack: cpuInitialRack,
+          cpuScore: 0,
+          cpuWordHistory: [],
+          battleTurn: 0,
+          lastCpuMove: null,
+          cpuHighlightCells: [],
+          cpuLetterLimit: null,
+        });
+      } else {
+        setBattleState(null);
+      }
+
       setScreen("game");
       startTimer();
     } catch (e) {
@@ -229,7 +269,7 @@ export default function App() {
     } finally {
       setLoading(false);
     }
-  }, [userId, selectedCategory, selectedBoardSize, selectedMaxTurns, startTimer]);
+  }, [userId, selectedCategory, selectedBoardSize, selectedMaxTurns, gameMode, startTimer]);
 
   // ラック選択
   const selectRackTile = useCallback((index: number) => {
@@ -275,7 +315,7 @@ export default function App() {
   // セルクリック
   const handleCellClick = useCallback(
     (x: number, y: number) => {
-      if (!gameState || gameState.finished) return;
+      if (!gameState || gameState.finished || cpuThinking) return;
       const cell = gameState.board[y][x];
 
       // 仮置き済みセルをクリック → 取り消し
@@ -338,7 +378,7 @@ export default function App() {
   // ドロップ処理
   const handleDropOnCell = useCallback(
     (x: number, y: number, data: string) => {
-      if (!gameState || gameState.finished) return;
+      if (!gameState || gameState.finished || cpuThinking) return;
       const cell = gameState.board[y][x];
       if (cell.char !== null || cell.pending !== null) return;
 
@@ -398,6 +438,8 @@ export default function App() {
         case "recover_free":
         case "upgrade_bonus":
         case "next_turn_mult":
+        case "reduce_opponent":
+        case "force_letter_count":
           break;
       }
 
@@ -422,6 +464,44 @@ export default function App() {
     );
   }, [userId]);
 
+  // CPU ターン実行
+  const executeCpuTurn = useCallback(
+    (state: GameState, battle: BattleState) => {
+      if (!dict) return;
+      setCpuThinking(true);
+      setMessage("CPU が考え中...");
+
+      cpuTimerRef.current = setTimeout(() => {
+        const bestMove = findBestMove(state.board, battle.cpuRack, dict, state.layout, battle.cpuLetterLimit);
+
+        let result: { newState: GameState; newBattle: BattleState };
+        if (bestMove) {
+          result = applyCpuMove(state, battle, bestMove);
+          setMessage(
+            `CPU: ${bestMove.words.map((w) => `「${w.word}」${w.points}点`).join("、")}  (+${bestMove.score}点)`
+          );
+        } else {
+          result = applyCpuPass(state, battle);
+          setMessage("CPU はパスしました。");
+        }
+
+        setGameState(result.newState);
+        setBattleState(result.newBattle);
+        setCpuThinking(false);
+        cpuTimerRef.current = null;
+
+        if (result.newState.finished) {
+          stopTimer();
+          saveGameResult(result.newState);
+          setScreen("result");
+        } else {
+          startTimer();
+        }
+      }, 1200);
+    },
+    [dict, startTimer, stopTimer, saveGameResult]
+  );
+
   // 確定処理
   const handleConfirm = useCallback(() => {
     if (!gameState || !dict) return;
@@ -435,6 +515,118 @@ export default function App() {
     let scoreBreakdown = computeScore(gameState);
     const formedWords = result.formedWords ?? [];
 
+    // --- バトルモード ---
+    if (battleState) {
+      let battleGameState = gameState;
+
+      // スペシャルカード処理
+      const special = checkSpecialActivation(battleGameState, formedWords);
+      let specialMsg = "";
+      let newCpuLetterLimit: number | null = battleState.cpuLetterLimit;
+      let newCpuScore = battleState.cpuScore;
+
+      if (special.activated && battleGameState.specialSet) {
+        const card = battleGameState.specialSet;
+        const ev = scaledEffectValue(card.effectValue, card.level ?? 1);
+        let totalScore = scoreBreakdown.total;
+
+        switch (card.effectType) {
+          case "bonus_flat":
+            totalScore += Math.round(ev);
+            break;
+          case "word_multiplier": {
+            const extraScore = Math.round(totalScore * (ev - 1));
+            const cap = card.rarity === "SSR" ? 40 + (card.level - 1) * 10 : Infinity;
+            totalScore += Math.min(extraScore, cap);
+            break;
+          }
+          case "draw_normal": {
+            const drawCount = Math.round(ev);
+            const [drawn, newBag] = drawTiles(battleGameState.bag, drawCount);
+            battleGameState = {
+              ...battleGameState,
+              rack: [...battleGameState.rack, ...drawn],
+              bag: newBag,
+            };
+            break;
+          }
+          case "recover_free": {
+            const recoverCount = Math.round(ev);
+            const newFreePool = { ...battleGameState.freePool };
+            let recovered = 0;
+            for (const letter of Object.keys(newFreePool)) {
+              if (recovered >= recoverCount) break;
+              if (newFreePool[letter] > 0) {
+                newFreePool[letter] = Math.max(0, newFreePool[letter] - 1);
+                recovered++;
+              }
+            }
+            battleGameState = { ...battleGameState, freePool: newFreePool };
+            break;
+          }
+          case "next_turn_mult":
+            battleGameState = { ...battleGameState, nextTurnMultiplier: ev };
+            break;
+          case "reduce_opponent":
+            newCpuScore = Math.max(0, newCpuScore - Math.round(ev));
+            break;
+          case "force_letter_count":
+            newCpuLetterLimit = Math.round(ev);
+            break;
+          case "upgrade_bonus":
+            break;
+        }
+
+        scoreBreakdown = { ...scoreBreakdown, total: totalScore };
+        specialMsg = ` ${special.effectDesc}`;
+
+        battleGameState = {
+          ...battleGameState,
+          usedSpecialIds: [...battleGameState.usedSpecialIds, card.instanceId],
+          specialHand: battleGameState.specialHand.filter((c) => c.instanceId !== card.instanceId),
+        };
+      }
+
+      const moveResult = { formedWords, scoreBreakdown };
+      let finalState = applyMove(battleGameState, moveResult);
+
+      // battleTurn で終了判定を上書き
+      const newBattleTurn = battleState.battleTurn + 1;
+      const finished = newBattleTurn >= gameState.maxTurns * 2;
+      finalState = { ...finalState, finished };
+
+      const newBattle: BattleState = {
+        ...battleState,
+        battleTurn: newBattleTurn,
+        turnOwner: "cpu",
+        cpuHighlightCells: [],
+        cpuScore: newCpuScore,
+        cpuLetterLimit: newCpuLetterLimit,
+      };
+
+      setGameState(finalState);
+      setBattleState(newBattle);
+      setSelectedRackIndex(null);
+      setSelectedFreeLetter(null);
+      setMessage(
+        scoreBreakdown.breakdown
+          .map((b) => `「${b.word}」${b.points}点`)
+          .join("、") +
+        `  (+${scoreBreakdown.total}点)` +
+        specialMsg
+      );
+      stopTimer();
+
+      if (finished) {
+        saveGameResult(finalState);
+        setScreen("result");
+      } else {
+        executeCpuTurn(finalState, newBattle);
+      }
+      return;
+    }
+
+    // --- ソロモード: 既存ロジック ---
     const special = checkSpecialActivation(gameState, formedWords);
     let newState = gameState;
 
@@ -516,17 +708,45 @@ export default function App() {
     } else {
       startTimer();
     }
-  }, [gameState, dict, checkSpecialActivation, startTimer, stopTimer, saveGameResult]);
+  }, [gameState, dict, battleState, checkSpecialActivation, executeCpuTurn, startTimer, stopTimer, saveGameResult]);
 
   // パス処理（内部用）
   const handlePassInternal = useCallback(() => {
     if (!gameState) return;
 
     const newState = applyPass(gameState);
-    setGameState(newState);
     setSelectedRackIndex(null);
     setSelectedFreeLetter(null);
     setMessage("パスしました。");
+
+    // --- バトルモード ---
+    if (battleState) {
+      const newBattleTurn = battleState.battleTurn + 1;
+      const finished = newBattleTurn >= gameState.maxTurns * 2;
+      const finalState = { ...newState, finished };
+
+      const newBattle: BattleState = {
+        ...battleState,
+        battleTurn: newBattleTurn,
+        turnOwner: "cpu",
+        cpuHighlightCells: [],
+      };
+
+      setGameState(finalState);
+      setBattleState(newBattle);
+      stopTimer();
+
+      if (finished) {
+        saveGameResult(finalState);
+        setScreen("result");
+      } else {
+        executeCpuTurn(finalState, newBattle);
+      }
+      return;
+    }
+
+    // --- ソロモード ---
+    setGameState(newState);
 
     if (newState.finished) {
       stopTimer();
@@ -535,7 +755,7 @@ export default function App() {
     } else {
       startTimer();
     }
-  }, [gameState, startTimer, stopTimer, saveGameResult]);
+  }, [gameState, battleState, executeCpuTurn, startTimer, stopTimer, saveGameResult]);
 
   // パス（UI経由）
   const handlePass = useCallback(() => {
@@ -554,6 +774,8 @@ export default function App() {
   // 中断
   const handleQuit = useCallback(() => {
     if (window.confirm("ゲームを中断しますか？\nスコアは記録されません。")) {
+      if (cpuTimerRef.current) { clearTimeout(cpuTimerRef.current); cpuTimerRef.current = null; }
+      setCpuThinking(false);
       returnToTitle();
     }
   }, [returnToTitle]);
@@ -659,6 +881,24 @@ export default function App() {
                 <span className="category-select-card__name">{CATEGORY_LABELS[c]}</span>
               </button>
             ))}
+          </div>
+
+          <h2 className="category-select-screen__section-title">ゲームモード</h2>
+          <div className="category-select-screen__options">
+            <button
+              className={`option-card ${gameMode === "solo" ? "option-card--active" : ""}`}
+              onClick={() => setGameMode("solo")}
+            >
+              <span className="option-card__label">ソロ</span>
+              <span className="option-card__desc">一人でプレイ</span>
+            </button>
+            <button
+              className={`option-card ${gameMode === "battle" ? "option-card--active" : ""}`}
+              onClick={() => setGameMode("battle")}
+            >
+              <span className="option-card__label">CPU対戦</span>
+              <span className="option-card__desc">CPUと対決</span>
+            </button>
           </div>
 
           <h2 className="category-select-screen__section-title">盤面サイズ</h2>
@@ -780,21 +1020,58 @@ export default function App() {
 
   // 結果画面
   if (screen === "result" && gameState) {
+    const isBattleResult = battleState !== null;
+    const playerWin = isBattleResult && gameState.score > battleState.cpuScore;
+    const cpuWin = isBattleResult && gameState.score < battleState.cpuScore;
+
     return (
       <div className="app app--result">
         <div className="result-screen">
           <h1>ゲーム終了！</h1>
+
+          {isBattleResult && (
+            <>
+              <h2 className={`result-screen__battle-result ${playerWin ? "result-screen__battle-result--win" : cpuWin ? "result-screen__battle-result--lose" : "result-screen__battle-result--draw"}`}>
+                {playerWin ? "あなたの勝ち！" : cpuWin ? "CPUの勝ち..." : "引き分け！"}
+              </h2>
+              <div className="result-screen__battle-scores">
+                <div className="result-screen__battle-player">
+                  <strong>You</strong>: {gameState.score}点
+                </div>
+                <div className="result-screen__battle-cpu">
+                  <strong>CPU</strong>: {battleState.cpuScore}点
+                </div>
+              </div>
+            </>
+          )}
+
           <p className="result-screen__category">ステージ: {CATEGORY_LABELS[gameState.category]}</p>
-          <p className="result-screen__score">
-            スコア: <strong>{gameState.score}</strong> 点
-          </p>
-          <p className="result-screen__turns">ターン: {gameState.turn} / {gameState.maxTurns}</p>
+
+          {!isBattleResult && (
+            <>
+              <p className="result-screen__score">
+                スコア: <strong>{gameState.score}</strong> 点
+              </p>
+              <p className="result-screen__turns">ターン: {gameState.turn} / {gameState.maxTurns}</p>
+            </>
+          )}
 
           {gameState.wordHistory.length > 0 && (
             <div className="result-screen__words">
-              <h3>使った単語（学習ログ）</h3>
+              <h3>{isBattleResult ? "あなたの単語" : "使った単語（学習ログ）"}</h3>
               <ul className="result-screen__word-list">
                 {[...new Set(gameState.wordHistory)].map((w) => (
+                  <li key={w} className="result-screen__word-item">{w}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {isBattleResult && battleState.cpuWordHistory.length > 0 && (
+            <div className="result-screen__words">
+              <h3>CPUの単語</h3>
+              <ul className="result-screen__word-list">
+                {[...new Set(battleState.cpuWordHistory)].map((w) => (
                   <li key={w} className="result-screen__word-item">{w}</li>
                 ))}
               </ul>
@@ -822,10 +1099,14 @@ export default function App() {
           maxTurns={gameState.maxTurns}
           timeRemaining={timeRemaining}
           bagCount={gameState.bag.length}
+          battleMode={battleState !== null}
+          cpuScore={battleState?.cpuScore}
+          turnOwner={battleState?.turnOwner}
+          battleTurn={battleState?.battleTurn}
         />
 
         {message && (
-          <div className={`game-message ${message.includes("点") ? "game-message--success" : message.includes("パス") ? "game-message--info" : "game-message--error"}`}>
+          <div className={`game-message ${cpuThinking ? "game-message--cpu" : message.includes("CPU") ? "game-message--cpu" : message.includes("点") ? "game-message--success" : message.includes("パス") ? "game-message--info" : "game-message--error"}`}>
             {message}
           </div>
         )}
@@ -840,6 +1121,7 @@ export default function App() {
           board={gameState.board}
           onCellClick={handleCellClick}
           onDropTile={handleDropOnCell}
+          cpuHighlightCells={battleState?.cpuHighlightCells}
         />
 
         <NormalRack
@@ -877,6 +1159,7 @@ export default function App() {
           canUndo={gameState.placedThisTurn.length > 0}
           spellCheckRemaining={gameState.spellCheckRemaining}
           spellHistoryCount={spellHistory.length}
+          allDisabled={cpuThinking}
         />
 
         {showSpellCheck && (

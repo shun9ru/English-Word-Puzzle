@@ -479,6 +479,74 @@
   border: 1px solid #cfd8dc;
 }
 
+/* --- バトルモード用ヘッダー --- */
+.game-header--battle {
+  gap: 8px;
+}
+
+.game-header__score--player {
+  font-weight: bold;
+  color: #1565c0;
+}
+
+.game-header__score--cpu {
+  font-weight: bold;
+  color: #e65100;
+}
+
+.game-header__score--active {
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #e8eaf6;
+}
+
+.game-header__vs {
+  font-size: 0.8rem;
+  color: #90a4ae;
+  font-weight: bold;
+}
+
+/* --- バトル結果 --- */
+.result-screen__battle-result {
+  font-size: 1.6rem;
+  margin-bottom: 16px;
+}
+
+.result-screen__battle-result--win {
+  color: #1565c0;
+}
+
+.result-screen__battle-result--lose {
+  color: #e65100;
+}
+
+.result-screen__battle-result--draw {
+  color: #546e7a;
+}
+
+.result-screen__battle-scores {
+  display: flex;
+  gap: 24px;
+  justify-content: center;
+  margin-bottom: 16px;
+  font-size: 1.1rem;
+}
+
+.result-screen__battle-player {
+  color: #1565c0;
+}
+
+.result-screen__battle-cpu {
+  color: #e65100;
+}
+
+/* CPU 考え中メッセージ */
+.game-message--cpu {
+  background: #fff3e0;
+  color: #e65100;
+  border: 1px solid #ffe0b2;
+}
+
 /* --- ランキング --- */
 .ranking {
   background: rgba(255, 255, 255, 0.7);
