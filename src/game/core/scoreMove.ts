@@ -12,7 +12,6 @@ import { extractFormedWords } from "./extractWords";
 function basePoints(source: TileSource): number {
   switch (source) {
     case "normal": return 3;
-    case "special": return 2;
     case "free": return 1;
   }
 }

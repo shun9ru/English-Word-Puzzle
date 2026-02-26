@@ -8,6 +8,7 @@ const CATEGORY_LABELS: Record<Category, string> = {
   animals: "Animals",
   food: "Food",
   jobs: "Jobs",
+  hobby: "Hobby",
   all: "All Genre",
 };
 
