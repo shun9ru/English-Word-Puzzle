@@ -1,0 +1,63 @@
+/* ========================================
+   チュートリアル
+   ======================================== */
+
+.tutorial {
+  max-width: 600px;
+  margin: 20px auto;
+  padding: 0 16px;
+}
+
+.tutorial__title {
+  font-size: 2rem;
+  color: #4a148c;
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.tutorial__section {
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+}
+
+.tutorial__section h2 {
+  font-size: 1.1rem;
+  color: #283593;
+  margin-bottom: 8px;
+  border-bottom: 2px solid #c5cae9;
+  padding-bottom: 4px;
+}
+
+.tutorial__section h3 {
+  font-size: 0.95rem;
+  color: #5c6bc0;
+  margin: 12px 0 4px;
+}
+
+.tutorial__section ul {
+  padding-left: 20px;
+}
+
+.tutorial__section li {
+  margin-bottom: 4px;
+  font-size: 0.9rem;
+  color: #37474f;
+}
+
+.tutorial__back-btn {
+  display: block;
+  margin: 24px auto;
+  padding: 12px 40px;
+  background: #546e7a;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.tutorial__back-btn:hover {
+  background: #37474f;
+}

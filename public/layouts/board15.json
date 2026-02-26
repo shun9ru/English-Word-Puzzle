@@ -1,0 +1,20 @@
+{
+  "size": 15,
+  "multipliers": [
+    ["TW","NONE","NONE","DL","NONE","NONE","NONE","TW","NONE","NONE","NONE","DL","NONE","NONE","TW"],
+    ["NONE","DW","NONE","NONE","NONE","TL","NONE","NONE","NONE","TL","NONE","NONE","NONE","DW","NONE"],
+    ["NONE","NONE","DW","NONE","NONE","NONE","DL","NONE","DL","NONE","NONE","NONE","DW","NONE","NONE"],
+    ["DL","NONE","NONE","DW","NONE","NONE","NONE","DL","NONE","NONE","NONE","DW","NONE","NONE","DL"],
+    ["NONE","NONE","NONE","NONE","DW","NONE","NONE","NONE","NONE","NONE","DW","NONE","NONE","NONE","NONE"],
+    ["NONE","TL","NONE","NONE","NONE","TL","NONE","NONE","NONE","TL","NONE","NONE","NONE","TL","NONE"],
+    ["NONE","NONE","DL","NONE","NONE","NONE","DL","NONE","DL","NONE","NONE","NONE","DL","NONE","NONE"],
+    ["TW","NONE","NONE","DL","NONE","NONE","NONE","DW","NONE","NONE","NONE","DL","NONE","NONE","TW"],
+    ["NONE","NONE","DL","NONE","NONE","NONE","DL","NONE","DL","NONE","NONE","NONE","DL","NONE","NONE"],
+    ["NONE","TL","NONE","NONE","NONE","TL","NONE","NONE","NONE","TL","NONE","NONE","NONE","TL","NONE"],
+    ["NONE","NONE","NONE","NONE","DW","NONE","NONE","NONE","NONE","NONE","DW","NONE","NONE","NONE","NONE"],
+    ["DL","NONE","NONE","DW","NONE","NONE","NONE","DL","NONE","NONE","NONE","DW","NONE","NONE","DL"],
+    ["NONE","NONE","DW","NONE","NONE","NONE","DL","NONE","DL","NONE","NONE","NONE","DW","NONE","NONE"],
+    ["NONE","DW","NONE","NONE","NONE","TL","NONE","NONE","NONE","TL","NONE","NONE","NONE","DW","NONE"],
+    ["TW","NONE","NONE","DL","NONE","NONE","NONE","TW","NONE","NONE","NONE","DL","NONE","NONE","TW"]
+  ]
+}

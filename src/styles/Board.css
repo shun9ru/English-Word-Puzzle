@@ -1,0 +1,72 @@
+/* ========================================
+   盤面スタイル
+   ======================================== */
+
+.board {
+  display: grid;
+  gap: 1px;
+  background: #78909c;
+  border: 2px solid #546e7a;
+  border-radius: 4px;
+  width: 100%;
+  max-width: 600px;
+  aspect-ratio: 1 / 1;
+}
+
+.cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #eceff1;
+  cursor: pointer;
+  position: relative;
+  font-size: clamp(0.5rem, 2.5vw, 1rem);
+  user-select: none;
+  transition: background 0.1s;
+}
+
+.cell:hover {
+  background: #cfd8dc;
+}
+
+.cell--dl {
+  background: #b3e5fc;
+}
+
+.cell--tl {
+  background: #81d4fa;
+}
+
+.cell--dw {
+  background: #fff9c4;
+}
+
+.cell--tw {
+  background: #ffcc80;
+}
+
+.cell--confirmed {
+  background: #fff;
+}
+
+.cell--pending {
+  background: #c8e6c9;
+  box-shadow: inset 0 0 0 2px #43a047;
+}
+
+.cell__char {
+  font-weight: bold;
+  color: #1a237e;
+  font-size: clamp(0.6rem, 3vw, 1.2rem);
+}
+
+.cell__multiplier {
+  font-size: clamp(0.35rem, 1.5vw, 0.6rem);
+  color: #78909c;
+  font-weight: bold;
+}
+
+.cell--dragover {
+  background: #90caf9 !important;
+  box-shadow: inset 0 0 0 2px #1565c0;
+}

@@ -1,0 +1,478 @@
+/* ========================================
+   App 全体レイアウト
+   ======================================== */
+
+.app {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 16px;
+  font-family: "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+  position: relative;
+  overflow: hidden;
+  transition: background 0.3s;
+}
+
+/* --- 画面別の背景 --- */
+
+.app--title {
+  background: linear-gradient(160deg, #e8eaf6 0%, #c5cae9 30%, #9fa8da 70%, #7986cb 100%);
+}
+
+.app--title::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle 80px at 10% 20%, rgba(255,255,255,0.4) 0%, transparent 70%),
+    radial-gradient(circle 60px at 85% 15%, rgba(255,255,255,0.3) 0%, transparent 70%),
+    radial-gradient(circle 100px at 70% 60%, rgba(255,255,255,0.2) 0%, transparent 70%),
+    radial-gradient(circle 50px at 25% 75%, rgba(255,255,255,0.3) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.app--tutorial {
+  background: linear-gradient(160deg, #ede9fe 0%, #e0d4fc 30%, #fce7f3 70%, #fdf2f8 100%);
+}
+
+.app--game {
+  background: linear-gradient(170deg, #e3f2fd 0%, #bbdefb 40%, #e1f5fe 100%);
+}
+
+.app--game::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle 120px at 5% 50%, rgba(144,202,249,0.2) 0%, transparent 70%),
+    radial-gradient(circle 100px at 95% 30%, rgba(144,202,249,0.15) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.app--result {
+  background: linear-gradient(160deg, #fff3e0 0%, #ffe0b2 30%, #ffcc80 70%, #ffb74d 100%);
+}
+
+.app--result::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle 80px at 20% 30%, rgba(255,183,77,0.3) 0%, transparent 70%),
+    radial-gradient(circle 60px at 75% 20%, rgba(255,167,38,0.25) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.app--gacha {
+  background: linear-gradient(160deg, #f3e5f5 0%, #e1bee7 30%, #ce93d8 70%, #ba68c8 100%);
+}
+
+.app--deck {
+  background: linear-gradient(160deg, #e8f5e9 0%, #c8e6c9 30%, #a5d6a7 70%, #81c784 100%);
+}
+
+.app > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* --- タイトル画面 --- */
+.title-screen {
+  text-align: center;
+  margin-top: 40px;
+  max-width: 600px;
+}
+
+.title-screen__heading {
+  font-size: 2.4rem;
+  color: #1a237e;
+  margin-bottom: 4px;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+}
+
+.title-screen__sub {
+  font-size: 1.1rem;
+  color: #3949ab;
+  margin-bottom: 32px;
+}
+
+.title-screen__categories {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.category-btn {
+  font-size: 1rem;
+  padding: 10px 20px;
+  border: 2px solid rgba(255,255,255,0.5);
+  border-radius: 12px;
+  background: rgba(255,255,255,0.3);
+  color: #1a237e;
+  cursor: pointer;
+  transition: all 0.15s;
+  backdrop-filter: blur(4px);
+}
+
+.category-btn:hover {
+  background: rgba(255,255,255,0.5);
+  border-color: rgba(255,255,255,0.8);
+}
+
+.category-btn--active {
+  border-color: #fff;
+  background: rgba(255,255,255,0.7);
+  font-weight: bold;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.start-btn {
+  font-size: 1.2rem;
+  padding: 14px 40px;
+  border: none;
+  border-radius: 12px;
+  background: #1565c0;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s;
+  display: block;
+  margin: 8px auto;
+}
+
+.start-btn:hover {
+  background: #0d47a1;
+}
+
+.start-btn:disabled {
+  background: #90a4ae;
+  cursor: not-allowed;
+}
+
+.start-btn--secondary {
+  background: #546e7a;
+}
+
+.start-btn--secondary:hover {
+  background: #37474f;
+}
+
+.start-btn--gacha {
+  background: #7b1fa2;
+}
+
+.start-btn--gacha:hover {
+  background: #6a1b9a;
+}
+
+.start-btn--deck {
+  background: #2e7d32;
+}
+
+.start-btn--deck:hover {
+  background: #1b5e20;
+}
+
+.start-btn--admin {
+  background: #e65100;
+}
+
+.start-btn--admin:hover {
+  background: #bf360c;
+}
+
+.start-btn--logout {
+  background: transparent;
+  color: #78909c;
+  font-size: 0.9rem;
+  padding: 8px 24px;
+  border: 1px solid #b0bec5;
+}
+
+.start-btn--logout:hover {
+  background: rgba(0,0,0,0.05);
+  color: #546e7a;
+}
+
+.title-screen__user {
+  color: #3949ab;
+  font-size: 0.9rem;
+  margin-bottom: 16px;
+}
+
+.app--login {
+  background: linear-gradient(160deg, #e8eaf6 0%, #c5cae9 30%, #9fa8da 70%, #7986cb 100%);
+  align-items: center;
+}
+
+.app--admin {
+  background: linear-gradient(160deg, #fff3e0 0%, #ffe0b2 40%, #ffcc80 100%);
+}
+
+.app--categorySelect {
+  background: linear-gradient(160deg, #e0f2f1 0%, #b2dfdb 30%, #80cbc4 70%, #4db6ac 100%);
+}
+
+/* --- カテゴリ選択画面 --- */
+.category-select-screen {
+  text-align: center;
+  margin-top: 40px;
+  max-width: 600px;
+}
+
+.category-select-screen__heading {
+  font-size: 2rem;
+  color: #004d40;
+  margin-bottom: 4px;
+}
+
+.category-select-screen__sub {
+  color: #00695c;
+  margin-bottom: 24px;
+}
+
+.category-select-screen__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.category-select-card {
+  padding: 20px 12px;
+  border: 2px solid rgba(255,255,255,0.5);
+  border-radius: 14px;
+  background: rgba(255,255,255,0.35);
+  backdrop-filter: blur(4px);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.category-select-card:hover {
+  background: rgba(255,255,255,0.55);
+  border-color: rgba(255,255,255,0.8);
+  transform: translateY(-2px);
+}
+
+.category-select-card--active {
+  border-color: #fff;
+  background: rgba(255,255,255,0.75);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  transform: translateY(-2px);
+}
+
+.category-select-card__name {
+  display: block;
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: #004d40;
+}
+
+.error-msg {
+  color: #d32f2f;
+  margin-top: 16px;
+}
+
+/* --- ゲーム画面 --- */
+.game-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 700px;
+}
+
+.game-header {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+  font-size: 0.9rem;
+  color: #37474f;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(4px);
+  padding: 8px 16px;
+  border-radius: 8px;
+  width: 100%;
+}
+
+.game-header__category {
+  font-weight: bold;
+  color: #1565c0;
+}
+
+.game-header__timer {
+  font-weight: bold;
+  color: #2e7d32;
+  font-variant-numeric: tabular-nums;
+}
+
+.game-header__timer--low {
+  color: #d32f2f;
+  animation: timer-pulse 0.8s ease-in-out infinite;
+}
+
+@keyframes timer-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.game-message {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  text-align: center;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.game-message--success {
+  background: #e8f5e9;
+  color: #1b5e20;
+  border: 1px solid #c8e6c9;
+}
+
+.game-message--error {
+  background: #ffebee;
+  color: #c62828;
+  border: 1px solid #ffcdd2;
+}
+
+.game-message--info {
+  background: #e3f2fd;
+  color: #1565c0;
+  border: 1px solid #bbdefb;
+}
+
+/* --- 結果画面 --- */
+.result-screen {
+  text-align: center;
+  margin-top: 40px;
+  max-width: 600px;
+}
+
+.result-screen h1 {
+  font-size: 2rem;
+  color: #e65100;
+  margin-bottom: 16px;
+}
+
+.result-screen__category {
+  font-size: 1.1rem;
+  color: #6d4c41;
+  margin-bottom: 8px;
+}
+
+.result-screen__score {
+  font-size: 1.8rem;
+  color: #e65100;
+  margin-bottom: 8px;
+}
+
+.result-screen__score strong {
+  font-size: 2.4rem;
+}
+
+.result-screen__turns {
+  color: #8d6e63;
+  margin-bottom: 24px;
+}
+
+.result-screen__words {
+  text-align: left;
+  background: rgba(255,255,255,0.7);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 24px;
+}
+
+.result-screen__words h3 {
+  margin-bottom: 8px;
+  color: #4e342e;
+}
+
+.result-screen__word-list {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.result-screen__word-item {
+  background: #fff;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 0.9rem;
+  color: #37474f;
+  border: 1px solid #cfd8dc;
+}
+
+/* --- ランキング --- */
+.ranking {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(226, 232, 240, 0.6);
+  border-radius: 12px;
+  padding: 16px 20px;
+  min-width: 220px;
+  max-width: 300px;
+  text-align: left;
+  margin-top: 16px;
+}
+
+.ranking__title {
+  font-size: 1rem;
+  color: #1a237e;
+  margin: 0 0 12px;
+  text-align: center;
+  border-bottom: 1px solid #c5cae9;
+  padding-bottom: 8px;
+}
+
+.ranking__list {
+  list-style: none;
+}
+
+.ranking__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  font-size: 0.9rem;
+  border-bottom: 1px solid #e8eaf6;
+}
+
+.ranking__item:last-child {
+  border-bottom: none;
+}
+
+.ranking__rank {
+  font-weight: bold;
+  color: #37474f;
+  min-width: 24px;
+}
+
+.ranking__score {
+  font-weight: bold;
+  color: #1565c0;
+  flex: 1;
+}
+
+.ranking__date {
+  color: #90a4ae;
+  font-size: 0.8rem;
+}
+
+.title-rankings {
+  margin-top: 24px;
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+}

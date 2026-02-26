@@ -1,0 +1,209 @@
+/* ========================================
+   スペシャルカード（英単語カード版）
+   ======================================== */
+
+.special-cards {
+  width: 100%;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.special-cards__set-area {
+  text-align: center;
+  min-width: 80px;
+}
+
+.special-cards__set-label,
+.special-cards__hand-label {
+  font-size: 0.75rem;
+  color: #546e7a;
+  margin-bottom: 4px;
+  font-weight: bold;
+}
+
+.special-cards__empty-slot {
+  width: 72px;
+  height: 80px;
+  border: 2px dashed #b0bec5;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #b0bec5;
+  font-size: 0.8rem;
+}
+
+/* セット枠 — カード詳細 */
+.special-cards__set-detail {
+  min-width: 160px;
+  background: #fff3e0;
+  border: 2px solid #ffb74d;
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.special-cards__set-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.special-cards__set-word {
+  font-size: 1rem;
+  font-weight: bold;
+  letter-spacing: 1px;
+}
+
+.special-cards__set-meaning {
+  font-size: 0.7rem;
+  color: #546e7a;
+}
+
+.special-cards__set-rarity {
+  font-size: 0.6rem;
+  font-weight: bold;
+}
+
+.special-cards__set-desc {
+  font-size: 0.65rem;
+  color: #78909c;
+  margin-bottom: 6px;
+}
+
+.special-cards__unset-btn {
+  font-size: 0.65rem;
+  padding: 2px 8px;
+  background: #ef5350;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-left: auto;
+}
+
+.special-cards__unset-btn:hover {
+  background: #c62828;
+}
+
+/* カードイラスト（Twemoji 画像） */
+.special-cards__icon {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.special-cards__icon-fallback {
+  font-size: 1.5rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+/* セットエリアのアイコンは大きめ */
+.special-cards__set-header .special-cards__icon {
+  width: 32px;
+  height: 32px;
+}
+
+.special-cards__set-header .special-cards__icon-fallback {
+  font-size: 1.8rem;
+}
+
+/* 目標単語ヒント */
+.special-cards__target-hint {
+  font-size: 0.7rem;
+  color: #e65100;
+  font-weight: bold;
+  margin-top: 4px;
+}
+
+/* 手持ちカード */
+.special-cards__hand {
+  flex: 1;
+}
+
+.special-cards__hand-list {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.special-cards__card {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  border: 2px solid #b0bec5;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  transition: all 0.15s;
+  padding: 4px;
+}
+
+.special-cards__card:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.special-cards__card:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.special-cards__card--blocked {
+  opacity: 0.35;
+}
+
+.special-cards__card-word {
+  font-size: 0.75rem;
+  font-weight: bold;
+  color: #1a237e;
+  letter-spacing: 0.5px;
+}
+
+.special-cards__card-meaning {
+  font-size: 0.55rem;
+  color: #546e7a;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.special-cards__rarity {
+  font-size: 0.6rem;
+  font-weight: bold;
+}
+
+/* レベルバッジ（セット枠） */
+.special-cards__set-level {
+  font-size: 0.65rem;
+  font-weight: bold;
+  color: #1565c0;
+}
+
+/* レベルバッジ（手持ちカード） */
+.special-cards__card-level {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: #1565c0;
+  color: #fff;
+  font-size: 0.5rem;
+  font-weight: bold;
+  padding: 1px 4px;
+  border-radius: 6px;
+  line-height: 1.3;
+}
+
+.special-cards__empty {
+  color: #90a4ae;
+  font-size: 0.85rem;
+  padding: 8px;
+}

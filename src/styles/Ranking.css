@@ -1,0 +1,29 @@
+.ranking-panel {
+  width: 100%;
+  margin-top: 16px;
+}
+
+.ranking-panel--loading {
+  text-align: center;
+  color: #90a4ae;
+  padding: 16px;
+}
+
+.ranking-panel__empty {
+  text-align: center;
+  color: #90a4ae;
+  padding: 16px;
+}
+
+.ranking__user {
+  font-size: 0.8rem;
+  color: #37474f;
+  font-weight: 500;
+  min-width: 60px;
+}
+
+.ranking__item--me {
+  background: #e3f2fd;
+  border-radius: 4px;
+  padding: 2px 4px;
+}

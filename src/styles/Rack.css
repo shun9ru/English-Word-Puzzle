@@ -1,0 +1,68 @@
+/* ========================================
+   ノーマルカード手札
+   ======================================== */
+
+.rack {
+  width: 100%;
+  text-align: center;
+}
+
+.rack__label {
+  font-size: 0.8rem;
+  color: #546e7a;
+  margin-bottom: 4px;
+  font-weight: bold;
+}
+
+.rack__tiles {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.rack__tile {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  font-weight: bold;
+  border: 2px solid #90a4ae;
+  border-radius: 8px;
+  background: #fff8e1;
+  color: #1a237e;
+  cursor: pointer;
+  transition: all 0.1s;
+  user-select: none;
+}
+
+.rack__tile:hover {
+  border-color: #1565c0;
+  transform: translateY(-2px);
+}
+
+.rack__tile--selected {
+  border-color: #1565c0;
+  background: #bbdefb;
+  transform: translateY(-4px);
+  box-shadow: 0 4px 8px rgba(21, 101, 192, 0.3);
+}
+
+.rack__tile[draggable] {
+  cursor: grab;
+}
+
+.rack__tile[draggable]:active {
+  cursor: grabbing;
+}
+
+.rack__tile--dragging {
+  opacity: 0.4;
+}
+
+.rack__tile:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
