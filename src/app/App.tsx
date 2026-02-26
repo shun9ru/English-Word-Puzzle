@@ -3,7 +3,7 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import type { GameState, Category, Placement, DictEntry, SpecialCard } from "../game/types";
+import type { GameState, Category, Placement, DictEntry, SpecialCard, SpellHistoryEntry } from "../game/types";
 import { loadDictionary } from "../game/dictionary";
 import { loadBoardLayout } from "../game/boardLayout";
 import { createEmptyBoard, cloneBoard, createFreePool } from "../game/core/helpers";
@@ -12,7 +12,7 @@ import { validateMove } from "../game/core/validateMove";
 import { applyMove, applyPass, undoPlacement, computeScore } from "../game/core/applyMove";
 import { prepareGameDeck, scaledEffectValue } from "../game/cards/deck";
 import { getCurrentUserId, setCurrentUserId, logout } from "../lib/auth";
-import { loginOrCreate } from "../lib/userService";
+import { loginOrCreate, getUser } from "../lib/userService";
 import { addGachaPointsDB } from "../lib/userService";
 import { saveScoreToDB } from "../lib/scoreService";
 import { loadDeckFromDB } from "../lib/collectionService";
@@ -29,6 +29,7 @@ import { Tutorial } from "../components/Tutorial";
 import { LoginScreen } from "../components/LoginScreen";
 import { RankingPanel } from "../components/RankingPanel";
 import { AdminScreen } from "../components/AdminScreen";
+import { CollectionScreen } from "../components/CollectionScreen";
 import "../styles/App.css";
 
 const CATEGORY_LABELS: Record<Category, string> = {
@@ -39,13 +40,23 @@ const CATEGORY_LABELS: Record<Category, string> = {
   all: "All Genre",
 };
 
-const MAX_TURNS = 10;
 const RACK_SIZE = 7;
-const BOARD_SIZE = 15;
 const TURN_TIME = 120;
 const MAX_FREE_USES = 2;
 
-type Screen = "login" | "title" | "categorySelect" | "game" | "result" | "tutorial" | "gacha" | "deckEdit" | "admin";
+const BOARD_SIZE_OPTIONS = [
+  { size: 9, label: "9×9", desc: "スモール" },
+  { size: 11, label: "11×11", desc: "ミディアム" },
+  { size: 15, label: "15×15", desc: "ラージ" },
+] as const;
+
+const TURN_OPTIONS = [
+  { turns: 5, label: "5ターン", desc: "クイック" },
+  { turns: 10, label: "10ターン", desc: "スタンダード" },
+  { turns: 15, label: "15ターン", desc: "ロング" },
+] as const;
+
+type Screen = "login" | "title" | "categorySelect" | "game" | "result" | "tutorial" | "gacha" | "deckEdit" | "collection" | "admin";
 
 export default function App() {
   // 認証
@@ -55,7 +66,20 @@ export default function App() {
   const [loginError, setLoginError] = useState("");
 
   const [screen, setScreen] = useState<Screen>(userId ? "title" : "login");
+
+  // セッション復帰時に管理者フラグを復元
+  useEffect(() => {
+    if (!userId) return;
+    getUser(userId).then((user) => {
+      if (user) {
+        setIsAdmin(user.is_admin);
+      }
+    });
+  }, [userId]);
+
   const [selectedCategory, setSelectedCategory] = useState<Category>("animals");
+  const [selectedBoardSize, setSelectedBoardSize] = useState(15);
+  const [selectedMaxTurns, setSelectedMaxTurns] = useState(10);
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [dict, setDict] = useState<Set<string> | null>(null);
   const [dictEntries, setDictEntries] = useState<DictEntry[]>([]);
@@ -64,6 +88,7 @@ export default function App() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [showSpellCheck, setShowSpellCheck] = useState(false);
+  const [spellHistory, setSpellHistory] = useState<SpellHistoryEntry[]>([]);
 
   // タイマー
   const [timeRemaining, setTimeRemaining] = useState(TURN_TIME);
@@ -145,6 +170,7 @@ export default function App() {
     setMessage("");
     setSelectedRackIndex(null);
     setSelectedFreeLetter(null);
+    setSpellHistory([]);
   }, [stopTimer]);
 
   // ゲーム開始
@@ -155,7 +181,7 @@ export default function App() {
     try {
       const [dictionary, layout] = await Promise.all([
         loadDictionary(selectedCategory),
-        loadBoardLayout(BOARD_SIZE),
+        loadBoardLayout(selectedBoardSize),
       ]);
       setDict(dictionary.set);
       setDictEntries(dictionary.entries);
@@ -164,7 +190,7 @@ export default function App() {
       const [initialRack, remainingBag] = drawTiles(bag, RACK_SIZE);
 
       // DBからデッキ読み込み
-      const playerDeck = await loadDeckFromDB(userId);
+      const playerDeck = await loadDeckFromDB(userId, selectedCategory);
       const gameDeck = prepareGameDeck(playerDeck);
       const initialSpecialHand = gameDeck.slice(0, Math.min(4, gameDeck.length));
       const remainingDeck = gameDeck.slice(initialSpecialHand.length);
@@ -176,7 +202,7 @@ export default function App() {
         placedThisTurn: [],
         score: 0,
         turn: 0,
-        maxTurns: MAX_TURNS,
+        maxTurns: selectedMaxTurns,
         category: selectedCategory,
         layout,
         finished: false,
@@ -195,6 +221,7 @@ export default function App() {
       setGameState(state);
       setSelectedRackIndex(null);
       setSelectedFreeLetter(null);
+      setSpellHistory([]);
       setScreen("game");
       startTimer();
     } catch (e) {
@@ -202,7 +229,7 @@ export default function App() {
     } finally {
       setLoading(false);
     }
-  }, [userId, selectedCategory, startTimer]);
+  }, [userId, selectedCategory, selectedBoardSize, selectedMaxTurns, startTimer]);
 
   // ラック選択
   const selectRackTile = useCallback((index: number) => {
@@ -292,6 +319,11 @@ export default function App() {
       // ラックから置く
       if (selectedRackIndex === null) return;
       if (selectedRackIndex >= gameState.rack.length) return;
+      // 既にこのターンで使用済みのタイルは置けない
+      const usedRackIndices = new Set(
+        gameState.placedThisTurn.filter((p) => p.rackIndex >= 0).map((p) => p.rackIndex)
+      );
+      if (usedRackIndices.has(selectedRackIndex)) return;
       const char = gameState.rack[selectedRackIndex];
       placeTileOnBoard(x, y, {
         x, y,
@@ -313,6 +345,10 @@ export default function App() {
       if (data.startsWith("normal:")) {
         const rackIndex = parseInt(data.split(":")[1], 10);
         if (isNaN(rackIndex) || rackIndex >= gameState.rack.length) return;
+        const usedRackIndices = new Set(
+          gameState.placedThisTurn.filter((p) => p.rackIndex >= 0).map((p) => p.rackIndex)
+        );
+        if (usedRackIndices.has(rackIndex)) return;
         placeTileOnBoard(x, y, {
           x, y,
           char: gameState.rack[rackIndex],
@@ -341,7 +377,8 @@ export default function App() {
 
       const card = state.specialSet;
 
-      if (card.category !== "all" && card.category !== state.category) {
+      // "all" ステージまたは "all" タグ持ちカードなら発動可能
+      if (state.category !== "all" && !card.categories.includes(state.category) && !card.categories.includes("all")) {
         return { bonus: 0, activated: false, effectDesc: "" };
       }
 
@@ -586,6 +623,15 @@ export default function App() {
     );
   }
 
+  // コレクション画面
+  if (screen === "collection") {
+    return (
+      <div className="app app--collection">
+        <CollectionScreen userId={userId} onBack={returnToTitle} />
+      </div>
+    );
+  }
+
   // 管理者画面
   if (screen === "admin" && isAdmin) {
     return (
@@ -611,6 +657,34 @@ export default function App() {
                 onClick={() => setSelectedCategory(c)}
               >
                 <span className="category-select-card__name">{CATEGORY_LABELS[c]}</span>
+              </button>
+            ))}
+          </div>
+
+          <h2 className="category-select-screen__section-title">盤面サイズ</h2>
+          <div className="category-select-screen__options">
+            {BOARD_SIZE_OPTIONS.map((opt) => (
+              <button
+                key={opt.size}
+                className={`option-card ${selectedBoardSize === opt.size ? "option-card--active" : ""}`}
+                onClick={() => setSelectedBoardSize(opt.size)}
+              >
+                <span className="option-card__label">{opt.label}</span>
+                <span className="option-card__desc">{opt.desc}</span>
+              </button>
+            ))}
+          </div>
+
+          <h2 className="category-select-screen__section-title">ターン数</h2>
+          <div className="category-select-screen__options">
+            {TURN_OPTIONS.map((opt) => (
+              <button
+                key={opt.turns}
+                className={`option-card ${selectedMaxTurns === opt.turns ? "option-card--active" : ""}`}
+                onClick={() => setSelectedMaxTurns(opt.turns)}
+              >
+                <span className="option-card__label">{opt.label}</span>
+                <span className="option-card__desc">{opt.desc}</span>
               </button>
             ))}
           </div>
@@ -664,6 +738,13 @@ export default function App() {
             onClick={() => setScreen("deckEdit")}
           >
             デッキ構築
+          </button>
+
+          <button
+            className="start-btn start-btn--collection"
+            onClick={() => setScreen("collection")}
+          >
+            コレクション
           </button>
 
           <button
@@ -764,6 +845,9 @@ export default function App() {
         <NormalRack
           tiles={gameState.rack}
           selectedIndex={selectedRackIndex}
+          usedIndices={new Set(
+            gameState.placedThisTurn.filter((p) => p.rackIndex >= 0).map((p) => p.rackIndex)
+          )}
           onSelect={selectRackTile}
         />
 
@@ -792,13 +876,16 @@ export default function App() {
           canConfirm={gameState.placedThisTurn.length > 0}
           canUndo={gameState.placedThisTurn.length > 0}
           spellCheckRemaining={gameState.spellCheckRemaining}
+          spellHistoryCount={spellHistory.length}
         />
 
         {showSpellCheck && (
           <SpellCheckModal
             entries={dictEntries}
             remaining={gameState.spellCheckRemaining}
+            history={spellHistory}
             onUse={handleUseSpellCheck}
+            onAddHistory={(entry) => setSpellHistory((prev) => [...prev, entry])}
             onClose={() => setShowSpellCheck(false)}
           />
         )}

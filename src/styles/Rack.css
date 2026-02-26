@@ -66,3 +66,28 @@
   opacity: 0.3;
   cursor: not-allowed;
 }
+
+.rack__tile--used {
+  background: #eceff1;
+  border-color: #cfd8dc;
+  border-style: dashed;
+  opacity: 0.3;
+}
+
+@media (max-width: 600px) {
+  .rack__label {
+    font-size: 0.7rem;
+    margin-bottom: 2px;
+  }
+
+  .rack__tiles {
+    gap: 4px;
+  }
+
+  .rack__tile {
+    width: 36px;
+    height: 36px;
+    font-size: 1.1rem;
+    border-radius: 6px;
+  }
+}

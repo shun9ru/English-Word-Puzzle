@@ -69,3 +69,31 @@
   color: #78909c;
   line-height: 1;
 }
+
+@media (max-width: 600px) {
+  .free-cards__label {
+    font-size: 0.7rem;
+    margin-bottom: 2px;
+  }
+
+  .free-cards__grid {
+    gap: 2px;
+    max-width: 100%;
+  }
+
+  .free-cards__btn {
+    width: 26px;
+    height: 26px;
+    font-size: 0.7rem;
+    border-radius: 4px;
+    border-width: 1px;
+  }
+
+  .free-cards__letter {
+    font-size: 0.7rem;
+  }
+
+  .free-cards__count {
+    font-size: 0.4rem;
+  }
+}

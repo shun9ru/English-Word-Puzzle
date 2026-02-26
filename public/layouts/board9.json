@@ -1,0 +1,14 @@
+{
+  "size": 9,
+  "multipliers": [
+    ["TW","NONE","NONE","DL","NONE","DL","NONE","NONE","TW"],
+    ["NONE","DW","NONE","NONE","TL","NONE","NONE","DW","NONE"],
+    ["NONE","NONE","DW","NONE","NONE","NONE","DW","NONE","NONE"],
+    ["DL","NONE","NONE","DL","NONE","DL","NONE","NONE","DL"],
+    ["NONE","TL","NONE","NONE","DW","NONE","NONE","TL","NONE"],
+    ["DL","NONE","NONE","DL","NONE","DL","NONE","NONE","DL"],
+    ["NONE","NONE","DW","NONE","NONE","NONE","DW","NONE","NONE"],
+    ["NONE","DW","NONE","NONE","TL","NONE","NONE","DW","NONE"],
+    ["TW","NONE","NONE","DL","NONE","DL","NONE","NONE","TW"]
+  ]
+}

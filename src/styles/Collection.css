@@ -1,0 +1,388 @@
+/* ========================================
+   コレクション画面（カード図鑑 + 単語図鑑）
+   ======================================== */
+
+.collection {
+  max-width: 720px;
+  width: 100%;
+  margin-top: 16px;
+}
+
+.collection__title {
+  font-size: 1.8rem;
+  color: #1b5e20;
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+/* === メインタブ（カード図鑑 / 単語図鑑） === */
+.collection__main-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.collection__main-tab {
+  padding: 8px 20px;
+  border: 2px solid #a5d6a7;
+  border-radius: 22px;
+  background: #fff;
+  color: #2e7d32;
+  font-size: 0.95rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.collection__main-tab:hover {
+  background: #e8f5e9;
+}
+
+.collection__main-tab--active {
+  background: #2e7d32;
+  color: #fff;
+  border-color: #2e7d32;
+}
+
+/* === 進捗バー === */
+.collection__progress {
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.collection__progress-text {
+  font-size: 0.85rem;
+  color: #546e7a;
+  margin-bottom: 4px;
+}
+
+.collection__progress-bar {
+  width: 80%;
+  max-width: 300px;
+  height: 8px;
+  background: #e0e0e0;
+  border-radius: 4px;
+  margin: 0 auto;
+  overflow: hidden;
+}
+
+.collection__progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #66bb6a, #43a047);
+  border-radius: 4px;
+  transition: width 0.3s;
+}
+
+/* === カード図鑑 === */
+.collection__card-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+}
+
+.collection__card {
+  position: relative;
+  width: 88px;
+  min-height: 110px;
+  border: 2px solid #b0bec5;
+  border-radius: 8px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 6px 4px;
+  transition: all 0.15s;
+}
+
+.collection__card--owned {
+  cursor: default;
+}
+
+.collection__card--owned:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12);
+}
+
+.collection__card--unknown {
+  background: #eceff1;
+  border-color: #cfd8dc;
+  opacity: 0.6;
+}
+
+.collection__card-icon {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+}
+
+.collection__card-icon--unknown {
+  filter: brightness(0) saturate(0);
+  opacity: 0.25;
+}
+
+.collection__card-word {
+  font-size: 0.78rem;
+  font-weight: bold;
+  color: #1a237e;
+  letter-spacing: 0.5px;
+}
+
+.collection__card-meaning {
+  font-size: 0.55rem;
+  color: #546e7a;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.collection__card-rarity {
+  font-size: 0.6rem;
+  font-weight: bold;
+}
+
+.collection__card-level {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: #1565c0;
+  color: #fff;
+  font-size: 0.55rem;
+  font-weight: bold;
+  padding: 1px 5px;
+  border-radius: 8px;
+  line-height: 1.3;
+}
+
+.collection__card-level--max {
+  background: linear-gradient(135deg, #ff6f00, #f44336);
+}
+
+.collection__card-desc {
+  font-size: 0.48rem;
+  color: #78909c;
+  text-align: center;
+  line-height: 1.2;
+}
+
+/* === 単語図鑑 === */
+.collection__cat-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.collection__cat-tab {
+  padding: 5px 12px;
+  border: 2px solid #81d4fa;
+  border-radius: 16px;
+  background: #fff;
+  color: #0277bd;
+  font-size: 0.8rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.collection__cat-tab:hover {
+  background: #e1f5fe;
+}
+
+.collection__cat-tab--active {
+  background: #0277bd;
+  color: #fff;
+  border-color: #0277bd;
+}
+
+/* 検索 */
+.collection__search {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.collection__search-input {
+  width: 80%;
+  max-width: 300px;
+  padding: 6px 12px;
+  border: 2px solid #b0bec5;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.collection__search-input:focus {
+  border-color: #42a5f5;
+}
+
+/* 単語リスト */
+.collection__word-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.collection__word-item {
+  display: flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-bottom: 1px solid #eceff1;
+  gap: 10px;
+  font-size: 0.88rem;
+}
+
+.collection__word-item--known {
+  background: #e8f5e9;
+}
+
+.collection__word-mark {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid #c8e6c9;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+}
+
+.collection__word-mark--known {
+  background: #43a047;
+  border-color: #43a047;
+  color: #fff;
+}
+
+.collection__word-eng {
+  font-weight: bold;
+  color: #1a237e;
+  min-width: 90px;
+}
+
+.collection__word-jpn {
+  color: #546e7a;
+}
+
+.collection__word-jpn--hidden {
+  color: #bdbdbd;
+}
+
+/* === 共通 === */
+.collection__back-btn {
+  display: block;
+  margin: 20px auto;
+  padding: 12px 32px;
+  background: #546e7a;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.collection__back-btn:hover {
+  background: #37474f;
+}
+
+.collection__loading {
+  text-align: center;
+  color: #78909c;
+  padding: 40px 0;
+}
+
+@media (max-width: 600px) {
+  .collection {
+    margin-top: 8px;
+  }
+
+  .collection__title {
+    font-size: 1.3rem;
+    margin-bottom: 2px;
+  }
+
+  .collection__main-tabs {
+    margin-bottom: 8px;
+  }
+
+  .collection__main-tab {
+    padding: 5px 14px;
+    font-size: 0.8rem;
+  }
+
+  .collection__progress-text {
+    font-size: 0.75rem;
+  }
+
+  .collection__card-grid {
+    gap: 4px;
+  }
+
+  .collection__card {
+    width: 72px;
+    min-height: 90px;
+    padding: 4px 2px;
+  }
+
+  .collection__card-icon {
+    width: 24px;
+    height: 24px;
+  }
+
+  .collection__card-word {
+    font-size: 0.65rem;
+  }
+
+  .collection__card-meaning {
+    font-size: 0.48rem;
+  }
+
+  .collection__cat-tabs {
+    gap: 3px;
+    margin-bottom: 6px;
+  }
+
+  .collection__cat-tab {
+    padding: 4px 10px;
+    font-size: 0.7rem;
+  }
+
+  .collection__search-input {
+    font-size: 0.8rem;
+    padding: 5px 10px;
+  }
+
+  .collection__word-list {
+    max-height: 45vh;
+  }
+
+  .collection__word-item {
+    padding: 4px 8px;
+    gap: 6px;
+    font-size: 0.78rem;
+  }
+
+  .collection__word-mark {
+    width: 14px;
+    height: 14px;
+    font-size: 0.55rem;
+    border-width: 1.5px;
+  }
+
+  .collection__word-eng {
+    min-width: 70px;
+    font-size: 0.78rem;
+  }
+
+  .collection__back-btn {
+    margin: 12px auto;
+    padding: 10px 24px;
+    font-size: 0.9rem;
+  }
+}

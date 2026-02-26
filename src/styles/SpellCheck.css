@@ -18,6 +18,8 @@
   padding: 24px;
   max-width: 400px;
   width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
 }
 
@@ -66,6 +68,11 @@
   cursor: pointer;
   font-size: 0.95rem;
   font-weight: bold;
+  white-space: nowrap;
+}
+
+.spell-modal__search-btn:hover:not(:disabled) {
+  background: #3f51b5;
 }
 
 .spell-modal__search-btn:disabled {
@@ -73,8 +80,24 @@
   cursor: not-allowed;
 }
 
-.spell-modal__results {
+/* === 検索履歴 === */
+.spell-modal__history {
   margin-bottom: 16px;
+}
+
+.spell-modal__history-entry {
+  margin-bottom: 12px;
+  border: 1px solid #e8eaf6;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.spell-modal__history-query {
+  font-size: 0.8rem;
+  font-weight: bold;
+  color: #5c6bc0;
+  background: #e8eaf6;
+  padding: 6px 12px;
 }
 
 .spell-modal__list {
@@ -84,8 +107,8 @@
 .spell-modal__item {
   display: flex;
   justify-content: space-between;
-  padding: 8px 12px;
-  border-bottom: 1px solid #e8eaf6;
+  padding: 6px 12px;
+  border-bottom: 1px solid #f5f5f5;
 }
 
 .spell-modal__item:last-child {
@@ -95,17 +118,19 @@
 .spell-modal__word {
   font-weight: bold;
   color: #1a237e;
-  font-size: 1.1rem;
+  font-size: 1rem;
 }
 
 .spell-modal__meaning {
   color: #546e7a;
+  font-size: 0.9rem;
 }
 
 .spell-modal__no-result {
   color: #90a4ae;
   text-align: center;
-  padding: 16px;
+  padding: 12px;
+  font-size: 0.85rem;
 }
 
 .spell-modal__close-btn {
@@ -121,4 +146,47 @@
 
 .spell-modal__close-btn:hover {
   background: #546e7a;
+}
+
+@media (max-width: 600px) {
+  .spell-modal {
+    padding: 16px;
+    max-height: 75vh;
+  }
+
+  .spell-modal__title {
+    font-size: 1.1rem;
+  }
+
+  .spell-modal__desc {
+    font-size: 0.75rem;
+    margin-bottom: 10px;
+  }
+
+  .spell-modal__input {
+    padding: 8px 10px;
+    font-size: 0.9rem;
+  }
+
+  .spell-modal__search-btn {
+    padding: 8px 14px;
+    font-size: 0.85rem;
+  }
+
+  .spell-modal__history-query {
+    font-size: 0.7rem;
+    padding: 4px 10px;
+  }
+
+  .spell-modal__word {
+    font-size: 0.85rem;
+  }
+
+  .spell-modal__meaning {
+    font-size: 0.75rem;
+  }
+
+  .spell-modal__item {
+    padding: 4px 10px;
+  }
 }

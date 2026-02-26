@@ -74,7 +74,9 @@ export function applyMove(state: GameState, moveResult: MoveResult): GameState {
     specialHand: newSpecialHand,
     specialDeck: newSpecialDeck,
     specialSet: null,
-    lastSpecialCategory: state.specialSet?.category ?? null,
+    lastSpecialCategory: state.specialSet
+      ? (state.specialSet.categories.find((c) => c !== "all") ?? null)
+      : null,
     nextTurnMultiplier: 1,
     wordHistory: [...state.wordHistory, ...moveResult.formedWords],
     spellCheckRemaining: 3,

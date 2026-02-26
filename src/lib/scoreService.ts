@@ -29,6 +29,22 @@ export async function saveScoreToDB(
   if (error) throw error;
 }
 
+/** ユーザーが全ゲームで使用した単語を取得 */
+export async function loadUsedWords(userId: string): Promise<Set<string>> {
+  const { data, error } = await supabase
+    .from("scores")
+    .select("words")
+    .eq("user_id", userId);
+  if (error) throw error;
+  const allWords = new Set<string>();
+  for (const row of (data ?? []) as { words: string[] }[]) {
+    for (const w of row.words ?? []) {
+      allWords.add(w.toUpperCase());
+    }
+  }
+  return allWords;
+}
+
 /** カテゴリ別グローバルランキング */
 export async function getGlobalCategoryRanking(
   category: Category,

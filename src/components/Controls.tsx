@@ -13,6 +13,7 @@ interface ControlsProps {
   canConfirm: boolean;
   canUndo: boolean;
   spellCheckRemaining: number;
+  spellHistoryCount: number;
   allDisabled?: boolean;
 }
 
@@ -25,6 +26,7 @@ export function Controls({
   canConfirm,
   canUndo,
   spellCheckRemaining,
+  spellHistoryCount,
   allDisabled = false,
 }: ControlsProps) {
   const d = allDisabled;
@@ -54,9 +56,9 @@ export function Controls({
       <button
         className="controls__btn controls__btn--spell"
         onClick={onSpellCheck}
-        disabled={d || spellCheckRemaining <= 0}
+        disabled={d || (spellCheckRemaining <= 0 && spellHistoryCount === 0)}
       >
-        スペル確認({spellCheckRemaining})
+        スペル確認({spellCheckRemaining}){spellHistoryCount > 0 ? ` 履歴${spellHistoryCount}件` : ""}
       </button>
       <button
         className="controls__btn controls__btn--quit"

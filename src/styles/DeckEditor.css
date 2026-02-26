@@ -15,6 +15,37 @@
   margin-bottom: 20px;
 }
 
+/* カテゴリタブ */
+.deck-editor__tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.deck-editor__tab {
+  padding: 6px 14px;
+  border: 2px solid #a5d6a7;
+  border-radius: 20px;
+  background: #fff;
+  color: #2e7d32;
+  font-size: 0.85rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.deck-editor__tab:hover {
+  background: #e8f5e9;
+}
+
+.deck-editor__tab--active {
+  background: #2e7d32;
+  color: #fff;
+  border-color: #2e7d32;
+}
+
 .deck-editor__section {
   margin-bottom: 24px;
 }
@@ -149,4 +180,72 @@
 
 .deck-editor__back-btn:hover {
   background: #37474f;
+}
+
+@media (max-width: 600px) {
+  .deck-editor {
+    margin-top: 8px;
+  }
+
+  .deck-editor__title {
+    font-size: 1.3rem;
+    margin-bottom: 10px;
+  }
+
+  .deck-editor__tabs {
+    gap: 3px;
+    margin-bottom: 10px;
+  }
+
+  .deck-editor__tab {
+    padding: 4px 10px;
+    font-size: 0.75rem;
+  }
+
+  .deck-editor__section {
+    margin-bottom: 14px;
+  }
+
+  .deck-editor__section h2 {
+    font-size: 0.9rem;
+  }
+
+  .deck-editor__card-grid {
+    gap: 4px;
+    justify-content: center;
+  }
+
+  .deck-editor__card {
+    width: 72px;
+    min-height: 80px;
+    padding: 4px 2px;
+  }
+
+  .deck-editor__card-icon {
+    width: 22px;
+    height: 22px;
+  }
+
+  .deck-editor__card-word {
+    font-size: 0.65rem;
+  }
+
+  .deck-editor__card-meaning {
+    font-size: 0.48rem;
+  }
+
+  .deck-editor__hint {
+    font-size: 0.65rem;
+  }
+
+  .deck-editor__empty {
+    font-size: 0.8rem;
+    padding: 10px;
+  }
+
+  .deck-editor__back-btn {
+    margin: 12px auto;
+    padding: 10px 24px;
+    font-size: 0.9rem;
+  }
 }

@@ -263,3 +263,88 @@
   color: #e65100;
   font-weight: bold;
 }
+
+@media (max-width: 600px) {
+  .gacha-screen {
+    margin-top: 12px;
+  }
+
+  .gacha-screen__title {
+    font-size: 1.4rem;
+    margin-bottom: 4px;
+  }
+
+  .gacha-screen__points {
+    font-size: 1rem;
+    margin-bottom: 12px;
+  }
+
+  .gacha-screen__hint {
+    font-size: 0.65rem;
+    margin-bottom: 8px;
+  }
+
+  .gacha-banner-tab {
+    padding: 5px 10px;
+    font-size: 0.7rem;
+  }
+
+  .gacha-banner-info {
+    padding: 6px 10px;
+    margin-bottom: 10px;
+  }
+
+  .gacha-banner-info__desc {
+    font-size: 0.8rem;
+  }
+
+  .gacha-banner-info__rates {
+    font-size: 0.65rem;
+  }
+
+  .gacha-category-btn {
+    padding: 4px 10px;
+    font-size: 0.75rem;
+  }
+
+  .gacha-screen__buttons {
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .gacha-screen__btn {
+    font-size: 0.85rem;
+    padding: 8px 16px;
+  }
+
+  .gacha-screen__card-grid {
+    gap: 4px;
+  }
+
+  .gacha-screen__card {
+    width: 80px;
+    padding: 6px 4px;
+    gap: 2px;
+  }
+
+  .gacha-screen__card-icon {
+    width: 28px;
+    height: 28px;
+  }
+
+  .gacha-screen__card-word {
+    font-size: 0.8rem;
+  }
+
+  .gacha-screen__card-meaning {
+    font-size: 0.55rem;
+  }
+
+  .gacha-screen__card-rarity {
+    font-size: 0.6rem;
+  }
+
+  .gacha-screen__card-desc {
+    font-size: 0.5rem;
+  }
+}

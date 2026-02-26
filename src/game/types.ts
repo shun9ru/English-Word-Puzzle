@@ -77,7 +77,7 @@ export interface SpecialCardDef {
   /** 効果の説明 */
   description: string;
   rarity: Rarity;
-  category: Category;
+  categories: Category[];
   effectType: SpecialEffectType;
   effectValue: number;
   /** 単語を表す絵文字アイコン */
@@ -104,6 +104,12 @@ export interface ScoreEntry {
 export interface DictEntry {
   word: string;
   meaning: string;
+}
+
+/** スペル確認の検索履歴 */
+export interface SpellHistoryEntry {
+  query: string;
+  results: DictEntry[];
 }
 
 /** ゲーム全体の状態 */

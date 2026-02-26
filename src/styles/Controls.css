@@ -64,3 +64,15 @@
 .controls__btn--quit:hover:not(:disabled) {
   background: #37474f;
 }
+
+@media (max-width: 600px) {
+  .controls {
+    gap: 4px;
+  }
+
+  .controls__btn {
+    font-size: 0.8rem;
+    padding: 6px 12px;
+    border-radius: 8px;
+  }
+}

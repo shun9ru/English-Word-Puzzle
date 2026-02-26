@@ -26,10 +26,10 @@ export const GACHA_BANNERS: GachaBanner[] = [
     singleCost: 10,
     multiCost: 90,
     rates: [
-      { rarity: "N", weight: 60 },
-      { rarity: "R", weight: 25 },
-      { rarity: "SR", weight: 10 },
-      { rarity: "SSR", weight: 5 },
+      { rarity: "N", weight: 70 },
+      { rarity: "R", weight: 20 },
+      { rarity: "SR", weight: 7 },
+      { rarity: "SSR", weight: 3 },
     ],
   },
   {
@@ -39,10 +39,10 @@ export const GACHA_BANNERS: GachaBanner[] = [
     singleCost: 30,
     multiCost: 270,
     rates: [
-      { rarity: "N", weight: 40 },
+      { rarity: "N", weight: 50 },
       { rarity: "R", weight: 25 },
-      { rarity: "SR", weight: 25 },
-      { rarity: "SSR", weight: 10 },
+      { rarity: "SR", weight: 18 },
+      { rarity: "SSR", weight: 7 },
     ],
   },
   {
@@ -52,10 +52,10 @@ export const GACHA_BANNERS: GachaBanner[] = [
     singleCost: 50,
     multiCost: 450,
     rates: [
-      { rarity: "N", weight: 30 },
+      { rarity: "N", weight: 40 },
       { rarity: "R", weight: 25 },
-      { rarity: "SR", weight: 25 },
-      { rarity: "SSR", weight: 20 },
+      { rarity: "SR", weight: 22 },
+      { rarity: "SSR", weight: 13 },
     ],
   },
   {
@@ -65,10 +65,10 @@ export const GACHA_BANNERS: GachaBanner[] = [
     singleCost: 15,
     multiCost: 135,
     rates: [
-      { rarity: "N", weight: 60 },
-      { rarity: "R", weight: 25 },
-      { rarity: "SR", weight: 10 },
-      { rarity: "SSR", weight: 5 },
+      { rarity: "N", weight: 70 },
+      { rarity: "R", weight: 20 },
+      { rarity: "SR", weight: 7 },
+      { rarity: "SSR", weight: 3 },
     ],
   },
 ];
@@ -93,7 +93,7 @@ function generateInstanceId(): string {
 function getPool(rarity: Rarity, categoryFilter?: Category): SpecialCardDef[] {
   let pool = SPECIAL_CARD_DEFS.filter((c) => c.rarity === rarity);
   if (categoryFilter) {
-    pool = pool.filter((c) => c.category === categoryFilter || c.category === "all");
+    pool = pool.filter((c) => c.categories.includes(categoryFilter) || c.categories.includes("all"));
   }
   return pool;
 }
@@ -119,7 +119,7 @@ export function pullGacha10WithBanner(banner: GachaBanner): SpecialCard[] {
   if (!hasSRPlus) {
     let srPool = SPECIAL_CARD_DEFS.filter((c) => c.rarity === "SR" || c.rarity === "SSR");
     if (banner.categoryFilter) {
-      const filtered = srPool.filter((c) => c.category === banner.categoryFilter || c.category === "all");
+      const filtered = srPool.filter((c) => c.categories.includes(banner.categoryFilter!) || c.categories.includes("all"));
       if (filtered.length > 0) srPool = filtered;
     }
     const def = srPool[Math.floor(Math.random() * srPool.length)];

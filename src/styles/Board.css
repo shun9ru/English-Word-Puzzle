@@ -70,3 +70,9 @@
   background: #90caf9 !important;
   box-shadow: inset 0 0 0 2px #1565c0;
 }
+
+@media (max-width: 600px) {
+  .board {
+    max-width: min(95vw, 52vh);
+  }
+}

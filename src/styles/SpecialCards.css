@@ -207,3 +207,81 @@
   font-size: 0.85rem;
   padding: 8px;
 }
+
+@media (max-width: 600px) {
+  .special-cards {
+    gap: 6px;
+  }
+
+  .special-cards__set-area {
+    min-width: 60px;
+  }
+
+  .special-cards__set-label,
+  .special-cards__hand-label {
+    font-size: 0.65rem;
+    margin-bottom: 2px;
+  }
+
+  .special-cards__empty-slot {
+    width: 52px;
+    height: 56px;
+    font-size: 0.7rem;
+  }
+
+  .special-cards__set-detail {
+    min-width: 120px;
+    padding: 4px;
+  }
+
+  .special-cards__set-word {
+    font-size: 0.8rem;
+  }
+
+  .special-cards__set-meaning {
+    font-size: 0.6rem;
+  }
+
+  .special-cards__set-desc {
+    font-size: 0.55rem;
+    margin-bottom: 2px;
+  }
+
+  .special-cards__target-hint {
+    font-size: 0.6rem;
+  }
+
+  .special-cards__icon {
+    width: 20px;
+    height: 20px;
+  }
+
+  .special-cards__set-header .special-cards__icon {
+    width: 22px;
+    height: 22px;
+  }
+
+  .special-cards__card {
+    width: 56px;
+    height: 56px;
+    padding: 2px;
+    gap: 1px;
+  }
+
+  .special-cards__card-word {
+    font-size: 0.6rem;
+  }
+
+  .special-cards__card-meaning {
+    font-size: 0.45rem;
+  }
+
+  .special-cards__rarity {
+    font-size: 0.5rem;
+  }
+
+  .special-cards__card-level {
+    font-size: 0.4rem;
+    padding: 0px 3px;
+  }
+}

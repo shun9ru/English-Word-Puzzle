@@ -3,12 +3,20 @@
  */
 
 import { useState, useEffect, useCallback } from "react";
-import type { SpecialCard } from "../game/types";
+import type { SpecialCard, Category } from "../game/types";
 import { canAddToDeck, DECK_MAX, MAX_LEVEL, scaledEffectValue } from "../game/cards/deck";
 import { loadCollectionFromDB, loadDeckFromDB, saveDeckToDB } from "../lib/collectionService";
 import { rarityColor } from "../game/cards/gacha";
 import { emojiToImageUrl } from "../data/specialCardDefs";
 import "../styles/DeckEditor.css";
+
+const DECK_CATEGORIES: { key: Category; label: string }[] = [
+  { key: "animals", label: "Animals" },
+  { key: "food", label: "Food" },
+  { key: "jobs", label: "Jobs" },
+  { key: "hobby", label: "Hobby" },
+  { key: "all", label: "All Genre" },
+];
 
 interface DeckEditorProps {
   userId: string;
@@ -46,13 +54,14 @@ export function DeckEditor({ userId, onBack }: DeckEditorProps) {
   const [deck, setDeck] = useState<SpecialCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [activeCategory, setActiveCategory] = useState<Category>("animals");
 
-  // DB読み込み
+  // DB読み込み（カテゴリ別）
   useEffect(() => {
     setLoading(true);
     Promise.all([
       loadCollectionFromDB(userId),
-      loadDeckFromDB(userId),
+      loadDeckFromDB(userId, activeCategory),
     ]).then(([coll, dk]) => {
       setCollection(coll);
       setDeck(dk);
@@ -60,7 +69,12 @@ export function DeckEditor({ userId, onBack }: DeckEditorProps) {
     }).catch(() => {
       setLoading(false);
     });
-  }, [userId]);
+  }, [userId, activeCategory]);
+
+  const handleCategoryChange = useCallback((cat: Category) => {
+    setActiveCategory(cat);
+    setMessage("");
+  }, []);
 
   const handleAddToDeck = useCallback(async (card: SpecialCard) => {
     const check = canAddToDeck(deck, card);
@@ -71,15 +85,15 @@ export function DeckEditor({ userId, onBack }: DeckEditorProps) {
     const newDeck = [...deck, card];
     setDeck(newDeck);
     setMessage("");
-    await saveDeckToDB(userId, newDeck);
-  }, [userId, deck]);
+    await saveDeckToDB(userId, newDeck, activeCategory);
+  }, [userId, deck, activeCategory]);
 
   const handleRemoveFromDeck = useCallback(async (instanceId: string) => {
     const newDeck = deck.filter((c) => c.instanceId !== instanceId);
     setDeck(newDeck);
     setMessage("");
-    await saveDeckToDB(userId, newDeck);
-  }, [userId, deck]);
+    await saveDeckToDB(userId, newDeck, activeCategory);
+  }, [userId, deck, activeCategory]);
 
   if (loading) {
     return <div className="deck-editor"><p>読み込み中...</p></div>;
@@ -88,8 +102,13 @@ export function DeckEditor({ userId, onBack }: DeckEditorProps) {
   // デッキに入っているカードIDのセット
   const deckCardIds = new Set(deck.map((c) => c.id));
 
-  // コレクションからデッキに入っていないカードを抽出
-  const available = collection.filter((c) => !deckCardIds.has(c.id));
+  // コレクションからデッキに入っていない & このカテゴリで使えるカードを抽出
+  const available = collection.filter((c) => {
+    if (deckCardIds.has(c.id)) return false;
+    // "All Genre" タブでは全カードを表示
+    if (activeCategory === "all") return true;
+    return c.categories.includes(activeCategory);
+  });
 
   // レアリティ順にソート
   const rarityOrder = { SSR: 0, SR: 1, R: 2, N: 3 };
@@ -103,6 +122,18 @@ export function DeckEditor({ userId, onBack }: DeckEditorProps) {
   return (
     <div className="deck-editor">
       <h1 className="deck-editor__title">デッキ構築</h1>
+
+      <div className="deck-editor__tabs">
+        {DECK_CATEGORIES.map((cat) => (
+          <button
+            key={cat.key}
+            className={`deck-editor__tab ${activeCategory === cat.key ? "deck-editor__tab--active" : ""}`}
+            onClick={() => handleCategoryChange(cat.key)}
+          >
+            {cat.label}
+          </button>
+        ))}
+      </div>
 
       <div className="deck-editor__section">
         <h2>デッキ ({deck.length}/{DECK_MAX})</h2>

@@ -91,7 +91,9 @@ export function SpecialCardSlots({
         <div className="special-cards__hand-label">手持ち ({hand.length}/4)</div>
         <div className="special-cards__hand-list">
           {hand.map((card) => {
-            const isBlocked = card.category === lastSpecialCategory && card.category !== "all";
+            const isBlocked = lastSpecialCategory !== null
+              && card.categories.includes(lastSpecialCategory)
+              && !card.categories.includes("all");
             return (
               <button
                 key={card.instanceId}

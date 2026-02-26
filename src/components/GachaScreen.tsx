@@ -47,34 +47,50 @@ export function GachaScreen({ userId, onBack }: GachaScreenProps) {
     ? { ...selectedBanner, categoryFilter }
     : selectedBanner;
 
+  const [error, setError] = useState("");
+
   const handleSingle = useCallback(async () => {
     if (points === null || points < activeBanner.singleCost || animating) return;
     setAnimating(true);
-    const newPoints = points - activeBanner.singleCost;
-    setPoints(newPoints);
-    await updateGachaPoints(userId, newPoints);
+    setError("");
+    try {
+      const newPoints = points - activeBanner.singleCost;
+      setPoints(newPoints);
+      await updateGachaPoints(userId, newPoints);
 
-    const card = pullGachaWithBanner(activeBanner);
-    const { isLevelUp, newLevel } = await addToCollectionDB(userId, card);
-    setResults([{ card, isLevelUp, newLevel }]);
-    setAnimating(false);
+      const card = pullGachaWithBanner(activeBanner);
+      const { isLevelUp, newLevel } = await addToCollectionDB(userId, card);
+      setResults([{ card, isLevelUp, newLevel }]);
+    } catch (e) {
+      console.error("ガチャエラー:", e);
+      setError("保存に失敗しました。接続を確認してください。");
+    } finally {
+      setAnimating(false);
+    }
   }, [userId, points, animating, activeBanner]);
 
   const handleMulti = useCallback(async () => {
     if (points === null || points < activeBanner.multiCost || animating) return;
     setAnimating(true);
-    const newPoints = points - activeBanner.multiCost;
-    setPoints(newPoints);
-    await updateGachaPoints(userId, newPoints);
+    setError("");
+    try {
+      const newPoints = points - activeBanner.multiCost;
+      setPoints(newPoints);
+      await updateGachaPoints(userId, newPoints);
 
-    const cards = pullGacha10WithBanner(activeBanner);
-    const gachaResults: GachaResult[] = [];
-    for (const card of cards) {
-      const { isLevelUp, newLevel } = await addToCollectionDB(userId, card);
-      gachaResults.push({ card, isLevelUp, newLevel });
+      const cards = pullGacha10WithBanner(activeBanner);
+      const gachaResults: GachaResult[] = [];
+      for (const card of cards) {
+        const { isLevelUp, newLevel } = await addToCollectionDB(userId, card);
+        gachaResults.push({ card, isLevelUp, newLevel });
+      }
+      setResults(gachaResults);
+    } catch (e) {
+      console.error("10連ガチャエラー:", e);
+      setError("保存に失敗しました。接続を確認してください。");
+    } finally {
+      setAnimating(false);
     }
-    setResults(gachaResults);
-    setAnimating(false);
   }, [userId, points, animating, activeBanner]);
 
   if (points === null) {
@@ -125,6 +141,8 @@ export function GachaScreen({ userId, onBack }: GachaScreenProps) {
           ))}
         </div>
       )}
+
+      {error && <p style={{ color: "#d32f2f", textAlign: "center", fontWeight: "bold" }}>{error}</p>}
 
       <div className="gacha-screen__buttons">
         <button
