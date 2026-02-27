@@ -83,6 +83,11 @@
   100% { background: #fff3e0; }
 }
 
+.board--disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
 @media (max-width: 600px) {
   .board {
     max-width: min(95vw, 52vh);

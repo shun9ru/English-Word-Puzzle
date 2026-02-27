@@ -67,7 +67,8 @@ export type SpecialEffectType =
   | "upgrade_bonus"    // ボーナスマスアップグレード
   | "next_turn_mult"      // 次ターンスコア倍率
   | "reduce_opponent"     // 相手スコア減少（バトル専用）
-  | "force_letter_count"; // 相手の次ターン使用タイル数制限（バトル専用）
+  | "force_letter_count" // 相手の次ターン使用タイル数制限（バトル専用）
+  | "heal_hp";           // HP回復（HPバトル専用）
 
 /** スペシャルカード定義 */
 export interface SpecialCardDef {
@@ -117,10 +118,33 @@ export interface SpellHistoryEntry {
 }
 
 /** ゲームモード */
-export type GameMode = "solo" | "battle";
+export type GameMode = "solo" | "battle" | "local_pvp" | "online_pvp";
+
+/** バトルサブモード */
+export type BattleType = "score" | "hp";
 
 /** ターン所有者 */
 export type TurnOwner = "player" | "cpu";
+
+/** CPU難易度 */
+export type CpuDifficulty = "easy" | "normal" | "hard";
+
+/** ターンごとのスコア履歴エントリ */
+export interface TurnHistoryEntry {
+  turn: number;
+  player: "player" | "cpu" | "player1" | "player2";
+  words: { word: string; points: number }[];
+  baseScore: number;
+  specialCard?: string;
+  specialEffect?: string;
+  specialBonus: number;
+  multiplier: number;
+  totalScore: number;
+  cumulativeScore: number;
+  damageDealt?: number;
+  hpHealed?: number;
+  passed: boolean;
+}
 
 /** CPU の着手候補 */
 export interface CpuCandidate {
@@ -132,6 +156,8 @@ export interface CpuCandidate {
 /** 対戦モード用の状態 */
 export interface BattleState {
   mode: "battle";
+  /** バトルサブモード（スコア勝負 or HP勝負） */
+  battleType: BattleType;
   turnOwner: TurnOwner;
   /** CPU のラック（非公開） */
   cpuRack: string[];
@@ -151,6 +177,81 @@ export interface BattleState {
   cpuHighlightCells: { x: number; y: number }[];
   /** CPUの次ターンで使用すべきラックタイル数（null=制限なし） */
   cpuLetterLimit: number | null;
+  /** HP バトル用: プレイヤーHP */
+  playerHp: number;
+  /** HP バトル用: CPU HP */
+  cpuHp: number;
+  /** HP バトル用: 最大HP（初期値、表示用） */
+  maxHp: number;
+}
+
+/** PvP ターン所有者 */
+export type PvpTurnOwner = "player1" | "player2";
+
+/** PvP 各プレイヤーの状態 */
+export interface PvpPlayerState {
+  name: string;
+  rack: string[];
+  score: number;
+  wordHistory: string[];
+  hp: number;
+  specialDeck: SpecialCard[];
+  specialHand: SpecialCard[];
+  specialSet: SpecialCard | null;
+  usedSpecialIds: string[];
+  lastSpecialCategory: Category | null;
+  nextTurnMultiplier: number;
+  letterLimit: number | null;
+  freePool: Record<string, number>;
+  spellCheckRemaining: number;
+}
+
+/** PvP 対戦モード用の状態 */
+export interface PvpBattleState {
+  mode: "local_pvp" | "online_pvp";
+  battleType: BattleType;
+  turnOwner: PvpTurnOwner;
+  player1: PvpPlayerState;
+  player2: PvpPlayerState;
+  battleTurn: number;
+  maxHp: number;
+  /** 直前の手の情報（表示用） */
+  lastMove: {
+    player: PvpTurnOwner;
+    words: { word: string; points: number }[];
+    totalScore: number;
+    passed: boolean;
+  } | null;
+  /** 直前に置いたセル座標（ハイライト用） */
+  highlightCells: { x: number; y: number }[];
+  /** オンライン対戦用: ルームID */
+  roomId?: string;
+  /** オンライン対戦用: 自分がどちらか */
+  myRole?: PvpTurnOwner;
+}
+
+/** オンライン対戦ルームのステータス */
+export type RoomStatus = "waiting" | "playing" | "finished";
+
+/** ルーム設定 */
+export interface RoomConfig {
+  category: Category;
+  boardSize: number;
+  maxTurns: number;
+  battleType: BattleType;
+}
+
+/** Supabase battle_rooms テーブルの型 */
+export interface BattleRoom {
+  id: string;
+  invite_code: string;
+  host_user_id: string;
+  guest_user_id: string | null;
+  status: RoomStatus;
+  game_config: RoomConfig;
+  game_state: GameState | null;
+  pvp_battle_state: PvpBattleState | null;
+  created_at: string;
 }
 
 /** ゲーム全体の状態 */
@@ -186,4 +287,6 @@ export interface GameState {
   nextTurnMultiplier: number;
   /** このゲームで使った全単語 */
   wordHistory: string[];
+  /** ターンごとの得点履歴 */
+  turnHistory: TurnHistoryEntry[];
 }

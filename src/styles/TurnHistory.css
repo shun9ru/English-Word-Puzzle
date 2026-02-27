@@ -1,0 +1,198 @@
+/* ========================================
+   ターン別スコア履歴パネル
+   ======================================== */
+
+.turn-history {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.turn-history__toggle {
+  width: 100%;
+  padding: 8px 16px;
+  border: 1px solid #cfd8dc;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(4px);
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: #37474f;
+  font-weight: bold;
+  transition: background 0.15s;
+}
+
+.turn-history__toggle:hover {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.turn-history__list {
+  margin-top: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+}
+
+.turn-history__entry {
+  padding: 8px 10px;
+  border-radius: 6px;
+  border-left: 3px solid transparent;
+}
+
+.turn-history__entry--player {
+  background: rgba(21, 101, 192, 0.06);
+  border-left-color: #1565c0;
+}
+
+.turn-history__entry--cpu {
+  background: rgba(230, 81, 0, 0.06);
+  border-left-color: #e65100;
+}
+
+.turn-history__entry--player1 {
+  background: rgba(21, 101, 192, 0.06);
+  border-left-color: #1565c0;
+}
+
+.turn-history__entry--player2 {
+  background: rgba(230, 81, 0, 0.06);
+  border-left-color: #e65100;
+}
+
+.turn-history__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+}
+
+.turn-history__turn {
+  font-weight: bold;
+  color: #546e7a;
+  min-width: 28px;
+}
+
+.turn-history__player--player {
+  color: #1565c0;
+  font-weight: bold;
+}
+
+.turn-history__player--cpu {
+  color: #e65100;
+  font-weight: bold;
+}
+
+.turn-history__player--player1 {
+  color: #1565c0;
+  font-weight: bold;
+}
+
+.turn-history__player--player2 {
+  color: #e65100;
+  font-weight: bold;
+}
+
+.turn-history__total {
+  font-weight: bold;
+  color: #2e7d32;
+}
+
+.turn-history__cumulative {
+  color: #90a4ae;
+  font-size: 0.75rem;
+  margin-left: auto;
+}
+
+.turn-history__details {
+  margin-top: 4px;
+  font-size: 0.8rem;
+  color: #546e7a;
+}
+
+.turn-history__words {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 2px;
+}
+
+.turn-history__word {
+  background: rgba(255, 255, 255, 0.8);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  border: 1px solid #e0e0e0;
+}
+
+.turn-history__word-pts {
+  color: #2e7d32;
+  font-weight: bold;
+}
+
+.turn-history__formula {
+  font-size: 0.75rem;
+  color: #78909c;
+  font-family: monospace;
+  margin-top: 2px;
+}
+
+.turn-history__label-special {
+  color: #7b1fa2;
+  font-size: 0.7rem;
+}
+
+.turn-history__special {
+  color: #7b1fa2;
+  font-size: 0.75rem;
+  font-style: italic;
+  margin-top: 2px;
+}
+
+.turn-history__damage {
+  color: #d32f2f;
+  font-size: 0.75rem;
+  font-weight: bold;
+}
+
+.turn-history__heal {
+  color: #2e7d32;
+  font-size: 0.75rem;
+  font-weight: bold;
+}
+
+/* モバイル対応 */
+@media (max-width: 600px) {
+  .turn-history__toggle {
+    font-size: 0.75rem;
+    padding: 6px 10px;
+  }
+
+  .turn-history__list {
+    max-height: 200px;
+    padding: 4px;
+    gap: 4px;
+  }
+
+  .turn-history__entry {
+    padding: 4px 6px;
+  }
+
+  .turn-history__header {
+    font-size: 0.75rem;
+    gap: 4px;
+  }
+
+  .turn-history__details {
+    font-size: 0.7rem;
+  }
+
+  .turn-history__word {
+    font-size: 0.65rem;
+    padding: 1px 4px;
+  }
+}

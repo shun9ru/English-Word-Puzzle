@@ -3,9 +3,12 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import type { GameState, GameMode, Category, Placement, DictEntry, SpecialCard, SpellHistoryEntry, BattleState } from "../game/types";
+import type { GameState, GameMode, BattleType, CpuDifficulty, Category, Placement, DictEntry, SpecialCard, SpellHistoryEntry, BattleState, TurnHistoryEntry, PvpBattleState } from "../game/types";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import { findBestMove } from "../game/cpu/cpuAI";
 import { applyCpuMove, applyCpuPass } from "../game/cpu/applyCpuMove";
+import { initPvpBattleState, applyPvpMove, applyPvpPass, getCurrentPlayer, getOpponentPlayer, updateOpponentPlayer, swapRackForTurn } from "../game/pvp/pvpState";
+import { updateRoomGameState, finishRoom, subscribeToRoom, unsubscribeFromRoom } from "../lib/roomService";
 import { loadDictionary } from "../game/dictionary";
 import { loadBoardLayout } from "../game/boardLayout";
 import { createEmptyBoard, cloneBoard, createFreePool } from "../game/core/helpers";
@@ -32,6 +35,9 @@ import { LoginScreen } from "../components/LoginScreen";
 import { RankingPanel } from "../components/RankingPanel";
 import { AdminScreen } from "../components/AdminScreen";
 import { CollectionScreen } from "../components/CollectionScreen";
+import { TurnHistory } from "../components/TurnHistory";
+import { PvpLobby } from "../components/PvpLobby";
+import { OnlineLobby } from "../components/OnlineLobby";
 import "../styles/App.css";
 
 const CATEGORY_LABELS: Record<Category, string> = {
@@ -45,6 +51,7 @@ const CATEGORY_LABELS: Record<Category, string> = {
 const RACK_SIZE = 7;
 const TURN_TIME = 120;
 const MAX_FREE_USES = 2;
+const DEFAULT_MAX_HP = 100;
 
 const BOARD_SIZE_OPTIONS = [
   { size: 9, label: "9×9", desc: "スモール" },
@@ -58,7 +65,7 @@ const TURN_OPTIONS = [
   { turns: 15, label: "15ターン", desc: "ロング" },
 ] as const;
 
-type Screen = "login" | "title" | "categorySelect" | "game" | "result" | "tutorial" | "gacha" | "deckEdit" | "collection" | "admin";
+type Screen = "login" | "title" | "categorySelect" | "game" | "result" | "tutorial" | "gacha" | "deckEdit" | "collection" | "admin" | "pvpLobby" | "onlineLobby" | "ranking";
 
 export default function App() {
   // 認証
@@ -94,9 +101,20 @@ export default function App() {
 
   // バトルモード
   const [gameMode, setGameMode] = useState<GameMode>("solo");
+  const [battleType, setBattleType] = useState<BattleType>("score");
+  const [cpuDifficulty, setCpuDifficulty] = useState<CpuDifficulty>("normal");
+  const [showDifficultyPicker, setShowDifficultyPicker] = useState(false);
   const [battleState, setBattleState] = useState<BattleState | null>(null);
   const [cpuThinking, setCpuThinking] = useState(false);
   const cpuTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // PvP モード
+  const [pvpBattleState, setPvpBattleState] = useState<PvpBattleState | null>(null);
+  const [pvpPlayer1Name, setPvpPlayer1Name] = useState("Player 1");
+  const [pvpPlayer2Name, setPvpPlayer2Name] = useState("Player 2");
+  const [showTurnInterstitial, setShowTurnInterstitial] = useState(false);
+  const [onlineChannel, setOnlineChannel] = useState<RealtimeChannel | null>(null);
+  const [onlineRoomId, setOnlineRoomId] = useState<string | null>(null);
 
   // タイマー
   const [timeRemaining, setTimeRemaining] = useState(TURN_TIME);
@@ -155,7 +173,9 @@ export default function App() {
 
   // タイマー切れ → 自動パス（CPU思考中は無視）
   useEffect(() => {
-    if (timeRemaining <= 0 && gameState && !gameState.finished && screen === "game" && !cpuThinking) {
+    if (timeRemaining <= 0 && gameState && !gameState.finished && screen === "game" && !cpuThinking && !showTurnInterstitial) {
+      // オンラインPvPで相手ターン中は自動パスしない
+      if (pvpBattleState?.mode === "online_pvp" && pvpBattleState.myRole && pvpBattleState.turnOwner !== pvpBattleState.myRole) return;
       handlePassInternal();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -167,6 +187,15 @@ export default function App() {
       stopTimer();
     }
   }, [screen, stopTimer]);
+
+  // オンラインPvP cleanup
+  useEffect(() => {
+    return () => {
+      if (onlineChannel) {
+        unsubscribeFromRoom(onlineChannel);
+      }
+    };
+  }, [onlineChannel]);
 
   // タイトルに戻る
   const returnToTitle = useCallback(() => {
@@ -182,7 +211,16 @@ export default function App() {
     setSpellHistory([]);
     setBattleState(null);
     setCpuThinking(false);
-  }, [stopTimer]);
+    setShowDifficultyPicker(false);
+    // PvP cleanup
+    setPvpBattleState(null);
+    setShowTurnInterstitial(false);
+    if (onlineChannel) {
+      unsubscribeFromRoom(onlineChannel);
+      setOnlineChannel(null);
+    }
+    setOnlineRoomId(null);
+  }, [stopTimer, onlineChannel]);
 
   // ゲーム開始
   const startGame = useCallback(async () => {
@@ -201,20 +239,21 @@ export default function App() {
       const [initialRack, remainingBag] = drawTiles(bag, RACK_SIZE);
 
       const isBattle = gameMode === "battle";
+      const isPvp = gameMode === "local_pvp" || gameMode === "online_pvp";
 
-      // バトルモード: CPUラックもバッグからドロー
+      // バトルモード / PvP: 相手ラックもバッグからドロー
       let finalBag = remainingBag;
-      let cpuInitialRack: string[] = [];
-      if (isBattle) {
-        const [cpuRack, bagAfterCpu] = drawTiles(remainingBag, RACK_SIZE);
-        cpuInitialRack = cpuRack;
-        finalBag = bagAfterCpu;
+      let secondRack: string[] = [];
+      if (isBattle || isPvp) {
+        const [r2, bagAfter] = drawTiles(remainingBag, RACK_SIZE);
+        secondRack = r2;
+        finalBag = bagAfter;
       }
 
       // スペシャルカード読み込み（ソロモードではバトル専用カードを除外）
       const playerDeck = await loadDeckFromDB(userId, selectedCategory);
       const allDeck = prepareGameDeck(playerDeck);
-      const gameDeck = isBattle ? allDeck : allDeck.filter((c) => !c.battleOnly);
+      const gameDeck = (isBattle || isPvp) ? allDeck : allDeck.filter((c) => !c.battleOnly);
       const initialSpecialHand = gameDeck.slice(0, Math.min(4, gameDeck.length));
       const remainingDeck = gameDeck.slice(initialSpecialHand.length);
 
@@ -239,6 +278,7 @@ export default function App() {
         spellCheckRemaining: 3,
         nextTurnMultiplier: 1,
         wordHistory: [],
+        turnHistory: [],
       };
 
       setGameState(state);
@@ -246,20 +286,82 @@ export default function App() {
       setSelectedFreeLetter(null);
       setSpellHistory([]);
 
-      if (isBattle) {
+      if (isPvp) {
+        // PvP: player2用にもデッキを準備（PoC: 同一デッキのコピー）
+        const p2Deck = prepareGameDeck(playerDeck);
+        const p2GameDeck = p2Deck; // battleOnly含む
+
+        const pvp = initPvpBattleState(
+          gameMode as "local_pvp" | "online_pvp",
+          battleType,
+          pvpPlayer1Name,
+          pvpPlayer2Name,
+          initialRack,
+          secondRack,
+          gameDeck,
+          p2GameDeck,
+          DEFAULT_MAX_HP,
+        );
+
+        setPvpBattleState(pvp);
+        setBattleState(null);
+
+        // オンラインPvP: ホストが初期状態をDBに保存
+        if (gameMode === "online_pvp" && onlineRoomId) {
+          const hostPvp = { ...pvp, myRole: "player1" as const };
+          setPvpBattleState(hostPvp);
+          await updateRoomGameState(onlineRoomId, state, hostPvp);
+
+          // ゲーム中の更新を受信するためリスナーを再設定
+          if (onlineChannel) unsubscribeFromRoom(onlineChannel);
+          const ch = subscribeToRoom(onlineRoomId, (updatedRoom) => {
+            if (!updatedRoom.game_state || !updatedRoom.pvp_battle_state) return;
+            const gs = updatedRoom.game_state;
+            const remotePvp = updatedRoom.pvp_battle_state;
+
+            // ゲーム終了
+            if (gs.finished) {
+              setGameState(gs);
+              setPvpBattleState({ ...remotePvp, myRole: "player1" });
+              stopTimer();
+              setScreen("result");
+              return;
+            }
+
+            // 自分のターンになった → rack を入れ替えてタイマー開始
+            if (remotePvp.turnOwner === "player1") {
+              const swapped = swapRackForTurn(gs, remotePvp);
+              setGameState(swapped);
+              setPvpBattleState({ ...remotePvp, myRole: "player1" });
+              startTimer();
+            } else {
+              // 相手のターン → 盤面だけ更新（自分の手の結果を反映）
+              setGameState(gs);
+              setPvpBattleState({ ...remotePvp, myRole: "player1" });
+            }
+          });
+          setOnlineChannel(ch);
+        }
+      } else if (isBattle) {
         setBattleState({
           mode: "battle",
+          battleType,
           turnOwner: "player",
-          cpuRack: cpuInitialRack,
+          cpuRack: secondRack,
           cpuScore: 0,
           cpuWordHistory: [],
           battleTurn: 0,
           lastCpuMove: null,
           cpuHighlightCells: [],
           cpuLetterLimit: null,
+          playerHp: DEFAULT_MAX_HP,
+          cpuHp: DEFAULT_MAX_HP,
+          maxHp: DEFAULT_MAX_HP,
         });
+        setPvpBattleState(null);
       } else {
         setBattleState(null);
+        setPvpBattleState(null);
       }
 
       setScreen("game");
@@ -269,7 +371,7 @@ export default function App() {
     } finally {
       setLoading(false);
     }
-  }, [userId, selectedCategory, selectedBoardSize, selectedMaxTurns, gameMode, startTimer]);
+  }, [userId, selectedCategory, selectedBoardSize, selectedMaxTurns, gameMode, battleType, startTimer, pvpPlayer1Name, pvpPlayer2Name, onlineRoomId, onlineChannel]);
 
   // ラック選択
   const selectRackTile = useCallback((index: number) => {
@@ -315,7 +417,9 @@ export default function App() {
   // セルクリック
   const handleCellClick = useCallback(
     (x: number, y: number) => {
-      if (!gameState || gameState.finished || cpuThinking) return;
+      if (!gameState || gameState.finished || cpuThinking || showTurnInterstitial) return;
+      // PvP: オンライン対戦で相手ターン中は操作不可
+      if (pvpBattleState?.mode === "online_pvp" && pvpBattleState.myRole && pvpBattleState.turnOwner !== pvpBattleState.myRole) return;
       const cell = gameState.board[y][x];
 
       // 仮置き済みセルをクリック → 取り消し
@@ -378,7 +482,9 @@ export default function App() {
   // ドロップ処理
   const handleDropOnCell = useCallback(
     (x: number, y: number, data: string) => {
-      if (!gameState || gameState.finished || cpuThinking) return;
+      if (!gameState || gameState.finished || cpuThinking || showTurnInterstitial) return;
+      // PvP: オンライン対戦で相手ターン中は操作不可
+      if (pvpBattleState?.mode === "online_pvp" && pvpBattleState.myRole && pvpBattleState.turnOwner !== pvpBattleState.myRole) return;
       const cell = gameState.board[y][x];
       if (cell.char !== null || cell.pending !== null) return;
 
@@ -440,6 +546,7 @@ export default function App() {
         case "next_turn_mult":
         case "reduce_opponent":
         case "force_letter_count":
+        case "heal_hp":
           break;
       }
 
@@ -472,18 +579,64 @@ export default function App() {
       setMessage("CPU が考え中...");
 
       cpuTimerRef.current = setTimeout(() => {
-        const bestMove = findBestMove(state.board, battle.cpuRack, dict, state.layout, battle.cpuLetterLimit);
+        const bestMove = findBestMove(state.board, battle.cpuRack, dict, state.layout, battle.cpuLetterLimit, cpuDifficulty);
 
         let result: { newState: GameState; newBattle: BattleState };
         if (bestMove) {
           result = applyCpuMove(state, battle, bestMove);
-          setMessage(
-            `CPU: ${bestMove.words.map((w) => `「${w.word}」${w.points}点`).join("、")}  (+${bestMove.score}点)`
-          );
+          const scoreMsg = `CPU: ${bestMove.words.map((w) => `「${w.word}」${w.points}点`).join("、")}  (+${bestMove.score}点)`;
+          if (battle.battleType === "hp") {
+            setMessage(`${scoreMsg} (${bestMove.score}ダメージ！)`);
+          } else {
+            setMessage(scoreMsg);
+          }
         } else {
           result = applyCpuPass(state, battle);
           setMessage("CPU はパスしました。");
         }
+
+        // HPバトル: CPUのスコアでプレイヤーにダメージ
+        if (battle.battleType === "hp" && bestMove) {
+          const damage = bestMove.score;
+          const newPlayerHp = Math.max(0, result.newBattle.playerHp - damage);
+          result.newBattle = { ...result.newBattle, playerHp: newPlayerHp };
+
+          if (newPlayerHp <= 0) {
+            result.newState = { ...result.newState, finished: true };
+          }
+        }
+
+        // CPUターン履歴記録
+        const cpuTurnNum = Math.floor((battle.battleTurn + 1) / 2) + 1;
+        const cpuHistoryEntry: TurnHistoryEntry = bestMove
+          ? {
+              turn: cpuTurnNum,
+              player: "cpu",
+              words: bestMove.words,
+              baseScore: bestMove.score,
+              specialBonus: 0,
+              multiplier: 1,
+              totalScore: bestMove.score,
+              cumulativeScore: result.newBattle.cpuScore,
+              damageDealt: battle.battleType === "hp" ? bestMove.score : undefined,
+              passed: false,
+            }
+          : {
+              turn: cpuTurnNum,
+              player: "cpu",
+              words: [],
+              baseScore: 0,
+              specialBonus: 0,
+              multiplier: 1,
+              totalScore: 0,
+              cumulativeScore: battle.cpuScore,
+              passed: true,
+            };
+
+        result.newState = {
+          ...result.newState,
+          turnHistory: [...state.turnHistory, cpuHistoryEntry],
+        };
 
         setGameState(result.newState);
         setBattleState(result.newBattle);
@@ -499,7 +652,7 @@ export default function App() {
         }
       }, 1200);
     },
-    [dict, startTimer, stopTimer, saveGameResult]
+    [dict, cpuDifficulty, startTimer, stopTimer, saveGameResult]
   );
 
   // 確定処理
@@ -514,6 +667,166 @@ export default function App() {
 
     let scoreBreakdown = computeScore(gameState);
     const formedWords = result.formedWords ?? [];
+
+    // --- PvP モード ---
+    if (pvpBattleState) {
+      const currentPlayer = getCurrentPlayer(pvpBattleState);
+      const opponentPlayer = getOpponentPlayer(pvpBattleState);
+      const playerRole = pvpBattleState.turnOwner;
+
+      // スペシャルカード処理
+      const special = checkSpecialActivation(gameState, formedWords);
+      let specialMsg = "";
+      let pvpGameState = gameState;
+      let pvp = pvpBattleState;
+
+      if (special.activated && gameState.specialSet) {
+        const card = gameState.specialSet;
+        const ev = scaledEffectValue(card.effectValue, card.level ?? 1);
+        let totalScore = scoreBreakdown.total;
+
+        switch (card.effectType) {
+          case "bonus_flat":
+            totalScore += Math.round(ev);
+            break;
+          case "word_multiplier": {
+            const extraScore = Math.round(totalScore * (ev - 1));
+            const cap = card.rarity === "SSR" ? 40 + (card.level - 1) * 10 : Infinity;
+            totalScore += Math.min(extraScore, cap);
+            break;
+          }
+          case "draw_normal": {
+            const drawCount = Math.round(ev);
+            const [drawn, newBag] = drawTiles(pvpGameState.bag, drawCount);
+            pvpGameState = { ...pvpGameState, rack: [...pvpGameState.rack, ...drawn], bag: newBag };
+            break;
+          }
+          case "recover_free": {
+            const recoverCount = Math.round(ev);
+            const newFreePool = { ...pvpGameState.freePool };
+            let recovered = 0;
+            for (const letter of Object.keys(newFreePool)) {
+              if (recovered >= recoverCount) break;
+              if (newFreePool[letter] > 0) { newFreePool[letter] = Math.max(0, newFreePool[letter] - 1); recovered++; }
+            }
+            pvpGameState = { ...pvpGameState, freePool: newFreePool };
+            break;
+          }
+          case "next_turn_mult":
+            pvpGameState = { ...pvpGameState, nextTurnMultiplier: ev };
+            break;
+          case "reduce_opponent":
+            pvp = updateOpponentPlayer(pvp, { score: Math.max(0, opponentPlayer.score - Math.round(ev)) });
+            break;
+          case "force_letter_count":
+            pvp = updateOpponentPlayer(pvp, { letterLimit: Math.round(ev) });
+            break;
+          case "heal_hp":
+            break;
+          case "upgrade_bonus":
+            break;
+        }
+        scoreBreakdown = { ...scoreBreakdown, total: totalScore };
+        specialMsg = ` ${special.effectDesc}`;
+        pvpGameState = {
+          ...pvpGameState,
+          usedSpecialIds: [...pvpGameState.usedSpecialIds, card.instanceId],
+          specialHand: pvpGameState.specialHand.filter((c) => c.instanceId !== card.instanceId),
+        };
+      }
+
+      // HPバトル: ダメージ・回復
+      let updatedPlayerHp = currentPlayer.hp;
+      let updatedOpponentHp = opponentPlayer.hp;
+
+      if (pvpBattleState.battleType === "hp") {
+        updatedOpponentHp = Math.max(0, updatedOpponentHp - scoreBreakdown.total);
+        if (special.activated && gameState.specialSet?.effectType === "heal_hp") {
+          const card = gameState.specialSet;
+          const healAmount = Math.round(scaledEffectValue(card.effectValue, card.level ?? 1));
+          updatedPlayerHp = Math.min(pvpBattleState.maxHp, updatedPlayerHp + healAmount);
+        }
+      }
+
+      // 素点を記録
+      const rawScore = computeScore(gameState).total;
+
+      const moveResult = { formedWords, scoreBreakdown };
+      const { newState: pvpNewState, newPvp: pvpNewBattle } = applyPvpMove(pvpGameState, pvp, moveResult);
+
+      // HP更新を反映
+      const currentKey = playerRole === "player1" ? "player1" : "player2";
+      const opponentKey = playerRole === "player1" ? "player2" : "player1";
+      let finalPvp: PvpBattleState = {
+        ...pvpNewBattle,
+        [currentKey]: { ...pvpNewBattle[currentKey], hp: updatedPlayerHp },
+        [opponentKey]: { ...pvpNewBattle[opponentKey], hp: updatedOpponentHp },
+      };
+
+      const hpKo = pvpBattleState.battleType === "hp" && updatedOpponentHp <= 0;
+      let finalState = { ...pvpNewState, finished: hpKo || pvpNewState.finished };
+
+      // 履歴記録
+      let healAmount = 0;
+      if (pvpBattleState.battleType === "hp" && special.activated && gameState.specialSet?.effectType === "heal_hp") {
+        healAmount = Math.round(scaledEffectValue(gameState.specialSet.effectValue, gameState.specialSet.level ?? 1));
+      }
+      const pvpHistoryEntry: TurnHistoryEntry = {
+        turn: Math.floor(finalPvp.battleTurn / 2) + 1,
+        player: playerRole,
+        words: scoreBreakdown.breakdown,
+        baseScore: rawScore,
+        specialCard: special.activated ? gameState.specialSet?.word : undefined,
+        specialEffect: special.activated ? special.effectDesc : undefined,
+        specialBonus: scoreBreakdown.total - rawScore,
+        multiplier: gameState.nextTurnMultiplier,
+        totalScore: scoreBreakdown.total,
+        cumulativeScore: finalPvp[currentKey].score,
+        damageDealt: pvpBattleState.battleType === "hp" ? scoreBreakdown.total : undefined,
+        hpHealed: healAmount > 0 ? healAmount : undefined,
+        passed: false,
+      };
+      finalState = { ...finalState, turnHistory: [...gameState.turnHistory, pvpHistoryEntry] };
+
+      let msgText = scoreBreakdown.breakdown
+        .map((b) => `「${b.word}」${b.points}点`)
+        .join("、") + `  (+${scoreBreakdown.total}点)`;
+      if (pvpBattleState.battleType === "hp") {
+        msgText += ` (${scoreBreakdown.total}ダメージ！)`;
+      }
+      msgText += specialMsg;
+      setMessage(msgText);
+      stopTimer();
+
+      if (finalState.finished) {
+        setGameState(finalState);
+        setPvpBattleState(finalPvp);
+        saveGameResult(finalState);
+        if (onlineRoomId) {
+          updateRoomGameState(onlineRoomId, finalState, finalPvp);
+          finishRoom(onlineRoomId);
+        }
+        setScreen("result");
+      } else if (pvpBattleState.mode === "local_pvp") {
+        // ローカルPvP: ターン切替インタースティシャル表示
+        setGameState(finalState);
+        setPvpBattleState(finalPvp);
+        setSelectedRackIndex(null);
+        setSelectedFreeLetter(null);
+        setShowTurnInterstitial(true);
+      } else {
+        // オンラインPvP: DB に保存
+        const swapped = swapRackForTurn(finalState, finalPvp);
+        setGameState(swapped);
+        setPvpBattleState(finalPvp);
+        setSelectedRackIndex(null);
+        setSelectedFreeLetter(null);
+        if (onlineRoomId) {
+          updateRoomGameState(onlineRoomId, finalState, finalPvp);
+        }
+      }
+      return;
+    }
 
     // --- バトルモード ---
     if (battleState) {
@@ -573,6 +886,9 @@ export default function App() {
           case "force_letter_count":
             newCpuLetterLimit = Math.round(ev);
             break;
+          case "heal_hp":
+            // HP回復はスコア計算後に別途処理
+            break;
           case "upgrade_bonus":
             break;
         }
@@ -587,13 +903,55 @@ export default function App() {
         };
       }
 
+      // HPバトル: HP ダメージ・回復処理
+      let newPlayerHp = battleState.playerHp;
+      let newCpuHp = battleState.cpuHp;
+
+      if (battleState.battleType === "hp") {
+        // プレイヤーのスコア = CPUへのダメージ
+        newCpuHp = Math.max(0, newCpuHp - scoreBreakdown.total);
+
+        // heal_hp カード効果
+        if (special.activated && battleGameState.specialSet?.effectType === "heal_hp") {
+          const card = battleGameState.specialSet;
+          const healAmount = Math.round(scaledEffectValue(card.effectValue, card.level ?? 1));
+          newPlayerHp = Math.min(battleState.maxHp, newPlayerHp + healAmount);
+        }
+      }
+
+      // 素点を記録（スペシャル効果適用前）
+      const rawScore = computeScore(gameState).total;
+
       const moveResult = { formedWords, scoreBreakdown };
       let finalState = applyMove(battleGameState, moveResult);
 
       // battleTurn で終了判定を上書き
       const newBattleTurn = battleState.battleTurn + 1;
-      const finished = newBattleTurn >= gameState.maxTurns * 2;
+      const hpKo = battleState.battleType === "hp" && newCpuHp <= 0;
+      const finished = hpKo || newBattleTurn >= gameState.maxTurns * 2;
       finalState = { ...finalState, finished };
+
+      // プレイヤーターン履歴記録
+      let healAmount = 0;
+      if (battleState.battleType === "hp" && special.activated && gameState.specialSet?.effectType === "heal_hp") {
+        healAmount = Math.round(scaledEffectValue(gameState.specialSet.effectValue, gameState.specialSet.level ?? 1));
+      }
+      const playerHistoryEntry: TurnHistoryEntry = {
+        turn: Math.floor(newBattleTurn / 2) + 1,
+        player: "player",
+        words: scoreBreakdown.breakdown,
+        baseScore: rawScore,
+        specialCard: special.activated ? gameState.specialSet?.word : undefined,
+        specialEffect: special.activated ? special.effectDesc : undefined,
+        specialBonus: scoreBreakdown.total - rawScore,
+        multiplier: gameState.nextTurnMultiplier,
+        totalScore: scoreBreakdown.total,
+        cumulativeScore: finalState.score,
+        damageDealt: battleState.battleType === "hp" ? scoreBreakdown.total : undefined,
+        hpHealed: healAmount > 0 ? healAmount : undefined,
+        passed: false,
+      };
+      finalState = { ...finalState, turnHistory: [...gameState.turnHistory, playerHistoryEntry] };
 
       const newBattle: BattleState = {
         ...battleState,
@@ -602,19 +960,24 @@ export default function App() {
         cpuHighlightCells: [],
         cpuScore: newCpuScore,
         cpuLetterLimit: newCpuLetterLimit,
+        playerHp: newPlayerHp,
+        cpuHp: newCpuHp,
       };
 
       setGameState(finalState);
       setBattleState(newBattle);
       setSelectedRackIndex(null);
       setSelectedFreeLetter(null);
-      setMessage(
-        scoreBreakdown.breakdown
-          .map((b) => `「${b.word}」${b.points}点`)
-          .join("、") +
-        `  (+${scoreBreakdown.total}点)` +
-        specialMsg
-      );
+
+      let msgText = scoreBreakdown.breakdown
+        .map((b) => `「${b.word}」${b.points}点`)
+        .join("、") +
+        `  (+${scoreBreakdown.total}点)`;
+      if (battleState.battleType === "hp") {
+        msgText += ` (${scoreBreakdown.total}ダメージ！)`;
+      }
+      msgText += specialMsg;
+      setMessage(msgText);
       stopTimer();
 
       if (finished) {
@@ -685,8 +1048,27 @@ export default function App() {
       };
     }
 
+    // 素点を記録
+    const rawScoreSolo = computeScore(gameState).total;
+
     const moveResult = { formedWords, scoreBreakdown };
-    const finalState = applyMove(newState, moveResult);
+    let finalState = applyMove(newState, moveResult);
+
+    // ソロモード履歴記録
+    const soloHistoryEntry: TurnHistoryEntry = {
+      turn: gameState.turn + 1,
+      player: "player",
+      words: scoreBreakdown.breakdown,
+      baseScore: rawScoreSolo,
+      specialCard: special.activated ? gameState.specialSet?.word : undefined,
+      specialEffect: special.activated ? special.effectDesc : undefined,
+      specialBonus: scoreBreakdown.total - rawScoreSolo,
+      multiplier: gameState.nextTurnMultiplier,
+      totalScore: scoreBreakdown.total,
+      cumulativeScore: finalState.score,
+      passed: false,
+    };
+    finalState = { ...finalState, turnHistory: [...gameState.turnHistory, soloHistoryEntry] };
 
     setGameState(finalState);
     setSelectedRackIndex(null);
@@ -708,22 +1090,81 @@ export default function App() {
     } else {
       startTimer();
     }
-  }, [gameState, dict, battleState, checkSpecialActivation, executeCpuTurn, startTimer, stopTimer, saveGameResult]);
+  }, [gameState, dict, battleState, pvpBattleState, checkSpecialActivation, executeCpuTurn, startTimer, stopTimer, saveGameResult, onlineRoomId]);
 
   // パス処理（内部用）
   const handlePassInternal = useCallback(() => {
     if (!gameState) return;
 
-    const newState = applyPass(gameState);
     setSelectedRackIndex(null);
     setSelectedFreeLetter(null);
     setMessage("パスしました。");
+
+    // --- PvP モード ---
+    if (pvpBattleState) {
+      const playerRole = pvpBattleState.turnOwner;
+      const { newState: pvpNewState, newPvp } = applyPvpPass(gameState, pvpBattleState);
+
+      const passEntry: TurnHistoryEntry = {
+        turn: Math.floor(pvpNewState.turn) + 1,
+        player: playerRole,
+        words: [],
+        baseScore: 0,
+        specialBonus: 0,
+        multiplier: 1,
+        totalScore: 0,
+        cumulativeScore: getCurrentPlayer(pvpBattleState).score,
+        passed: true,
+      };
+      const finalState = { ...pvpNewState, turnHistory: [...gameState.turnHistory, passEntry] };
+
+      stopTimer();
+
+      if (finalState.finished) {
+        setGameState(finalState);
+        setPvpBattleState(pvpNewState.finished ? pvpNewState as unknown as PvpBattleState : newPvp);
+        setPvpBattleState(newPvp);
+        saveGameResult(finalState);
+        if (onlineRoomId) {
+          updateRoomGameState(onlineRoomId, finalState, newPvp);
+          finishRoom(onlineRoomId);
+        }
+        setScreen("result");
+      } else if (pvpBattleState.mode === "local_pvp") {
+        setGameState(finalState);
+        setPvpBattleState(newPvp);
+        setShowTurnInterstitial(true);
+      } else {
+        const swapped = swapRackForTurn(finalState, newPvp);
+        setGameState(swapped);
+        setPvpBattleState(newPvp);
+        if (onlineRoomId) {
+          updateRoomGameState(onlineRoomId, finalState, newPvp);
+        }
+      }
+      return;
+    }
+
+    const newState = applyPass(gameState);
+
+    // パス履歴エントリ
+    const passEntry: TurnHistoryEntry = {
+      turn: battleState ? Math.floor((battleState.battleTurn + 1) / 2) + 1 : gameState.turn + 1,
+      player: "player",
+      words: [],
+      baseScore: 0,
+      specialBonus: 0,
+      multiplier: 1,
+      totalScore: 0,
+      cumulativeScore: gameState.score,
+      passed: true,
+    };
 
     // --- バトルモード ---
     if (battleState) {
       const newBattleTurn = battleState.battleTurn + 1;
       const finished = newBattleTurn >= gameState.maxTurns * 2;
-      const finalState = { ...newState, finished };
+      const finalState = { ...newState, finished, turnHistory: [...gameState.turnHistory, passEntry] };
 
       const newBattle: BattleState = {
         ...battleState,
@@ -746,7 +1187,7 @@ export default function App() {
     }
 
     // --- ソロモード ---
-    setGameState(newState);
+    setGameState({ ...newState, turnHistory: [...gameState.turnHistory, passEntry] });
 
     if (newState.finished) {
       stopTimer();
@@ -755,7 +1196,7 @@ export default function App() {
     } else {
       startTimer();
     }
-  }, [gameState, battleState, executeCpuTurn, startTimer, stopTimer, saveGameResult]);
+  }, [gameState, battleState, pvpBattleState, executeCpuTurn, startTimer, stopTimer, saveGameResult, onlineRoomId]);
 
   // パス（UI経由）
   const handlePass = useCallback(() => {
@@ -863,6 +1304,117 @@ export default function App() {
     );
   }
 
+  // ランキング画面
+  if (screen === "ranking") {
+    return (
+      <div className="app app--categorySelect">
+        <div className="ranking-screen">
+          <h1 className="ranking-screen__heading">ランキング</h1>
+          <RankingPanel selectedCategory={selectedCategory} currentUserId={userId} />
+          <button className="start-btn start-btn--secondary" onClick={returnToTitle}>
+            もどる
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ローカルPvPロビー
+  if (screen === "pvpLobby") {
+    return (
+      <div className="app app--categorySelect">
+        <PvpLobby
+          onStart={(p1, p2) => {
+            setPvpPlayer1Name(p1);
+            setPvpPlayer2Name(p2);
+            setScreen("categorySelect");
+          }}
+          onBack={returnToTitle}
+        />
+      </div>
+    );
+  }
+
+  // オンラインPvPロビー
+  if (screen === "onlineLobby") {
+    return (
+      <div className="app app--categorySelect">
+        <OnlineLobby
+          userId={userId!}
+          config={{
+            category: selectedCategory,
+            boardSize: selectedBoardSize,
+            maxTurns: selectedMaxTurns,
+            battleType,
+          }}
+          onRoomCreated={(room) => {
+            setOnlineRoomId(room.id);
+            setPvpPlayer1Name(userId!);
+            // Subscribe to room updates (waiting for guest)
+            const channel = subscribeToRoom(room.id, (updatedRoom) => {
+              if (updatedRoom.status === "playing" && updatedRoom.guest_user_id) {
+                setPvpPlayer2Name(updatedRoom.guest_user_id);
+                setScreen("categorySelect");
+              }
+            });
+            setOnlineChannel(channel);
+          }}
+          onRoomJoined={(room) => {
+            setOnlineRoomId(room.id);
+            setPvpPlayer1Name(room.host_user_id);
+            setPvpPlayer2Name(userId!);
+            let gameStarted = false;
+            // Guest: subscribe for host's game start and ongoing updates
+            const channel = subscribeToRoom(room.id, (updatedRoom) => {
+              if (!updatedRoom.game_state || !updatedRoom.pvp_battle_state) return;
+              const gs = updatedRoom.game_state;
+              const remotePvp = updatedRoom.pvp_battle_state;
+
+              if (!gameStarted) {
+                // 初回: ゲーム開始
+                gameStarted = true;
+                const myPvp = { ...remotePvp, myRole: "player2" as const };
+                setPvpBattleState(myPvp);
+                // dict をロード
+                Promise.all([
+                  loadDictionary(gs.category),
+                  loadBoardLayout(gs.layout.size),
+                ]).then(([dictionary]) => {
+                  setDict(dictionary.set);
+                  setDictEntries(dictionary.entries);
+                });
+                // Player2のrackで表示
+                setGameState({ ...gs, rack: remotePvp.player2.rack });
+                setScreen("game");
+                // Player1が先手なので、Player2はまだタイマー不要
+              } else {
+                // 以降: ゲーム中の状態更新
+                if (gs.finished) {
+                  setGameState(gs);
+                  setPvpBattleState({ ...remotePvp, myRole: "player2" });
+                  stopTimer();
+                  setScreen("result");
+                } else if (remotePvp.turnOwner === "player2") {
+                  // 自分のターンになった
+                  const swapped = swapRackForTurn(gs, remotePvp);
+                  setGameState(swapped);
+                  setPvpBattleState({ ...remotePvp, myRole: "player2" });
+                  startTimer();
+                } else {
+                  // 相手のターン → 盤面だけ更新（自分の手の結果を反映）
+                  setGameState(gs);
+                  setPvpBattleState({ ...remotePvp, myRole: "player2" });
+                }
+              }
+            });
+            setOnlineChannel(channel);
+          }}
+          onBack={returnToTitle}
+        />
+      </div>
+    );
+  }
+
   // カテゴリ選択画面
   if (screen === "categorySelect") {
     return (
@@ -883,23 +1435,27 @@ export default function App() {
             ))}
           </div>
 
-          <h2 className="category-select-screen__section-title">ゲームモード</h2>
-          <div className="category-select-screen__options">
-            <button
-              className={`option-card ${gameMode === "solo" ? "option-card--active" : ""}`}
-              onClick={() => setGameMode("solo")}
-            >
-              <span className="option-card__label">ソロ</span>
-              <span className="option-card__desc">一人でプレイ</span>
-            </button>
-            <button
-              className={`option-card ${gameMode === "battle" ? "option-card--active" : ""}`}
-              onClick={() => setGameMode("battle")}
-            >
-              <span className="option-card__label">CPU対戦</span>
-              <span className="option-card__desc">CPUと対決</span>
-            </button>
-          </div>
+          {(gameMode === "battle" || gameMode === "local_pvp" || gameMode === "online_pvp") && (
+            <>
+              <h2 className="category-select-screen__section-title">バトルタイプ</h2>
+              <div className="category-select-screen__options">
+                <button
+                  className={`option-card ${battleType === "score" ? "option-card--active" : ""}`}
+                  onClick={() => setBattleType("score")}
+                >
+                  <span className="option-card__label">スコア勝負</span>
+                  <span className="option-card__desc">スコアが高い方が勝ち</span>
+                </button>
+                <button
+                  className={`option-card ${battleType === "hp" ? "option-card--active" : ""}`}
+                  onClick={() => setBattleType("hp")}
+                >
+                  <span className="option-card__label">HPバトル</span>
+                  <span className="option-card__desc">相手のHPを0にしたら勝ち</span>
+                </button>
+              </div>
+            </>
+          )}
 
           <h2 className="category-select-screen__section-title">盤面サイズ</h2>
           <div className="category-select-screen__options">
@@ -959,60 +1515,149 @@ export default function App() {
           <p className="title-screen__sub">英単語でパズルに挑戦しよう！</p>
           <p className="title-screen__user">ログイン中: <strong>{userId}</strong></p>
 
-          <button
-            className="start-btn"
-            onClick={() => setScreen("categorySelect")}
-          >
-            ゲーム
-          </button>
+          {/* ゲームグループ */}
+          <div className="title-screen__group">
+            <h2 className="title-screen__group-title">ゲーム</h2>
+            <div className="title-screen__group-btns">
+              <button
+                className="start-btn start-btn--solo"
+                onClick={() => {
+                  setGameMode("solo");
+                  setShowDifficultyPicker(false);
+                  setScreen("categorySelect");
+                }}
+              >
+                ソロプレイ
+              </button>
 
-          <button
-            className="start-btn start-btn--gacha"
-            onClick={() => setScreen("gacha")}
-          >
-            ガチャ
-          </button>
+              <button
+                className="start-btn start-btn--battle"
+                onClick={() => {
+                  setGameMode("battle");
+                  setShowDifficultyPicker(true);
+                }}
+              >
+                CPU対戦
+              </button>
 
-          <button
-            className="start-btn start-btn--deck"
-            onClick={() => setScreen("deckEdit")}
-          >
-            デッキ構築
-          </button>
+              <button
+                className="start-btn start-btn--local-pvp"
+                onClick={() => {
+                  setGameMode("local_pvp");
+                  setShowDifficultyPicker(false);
+                  setScreen("pvpLobby");
+                }}
+              >
+                ローカル対戦
+              </button>
 
-          <button
-            className="start-btn start-btn--collection"
-            onClick={() => setScreen("collection")}
-          >
-            コレクション
-          </button>
+              <button
+                className="start-btn start-btn--online-pvp"
+                onClick={() => {
+                  setGameMode("online_pvp");
+                  setShowDifficultyPicker(false);
+                  setScreen("onlineLobby");
+                }}
+              >
+                オンライン対戦
+              </button>
+            </div>
 
-          <button
-            className="start-btn start-btn--secondary"
-            onClick={() => setScreen("tutorial")}
-          >
-            あそびかた
-          </button>
+            {showDifficultyPicker && (
+              <div className="difficulty-picker">
+                <h3 className="difficulty-picker__title">CPUの強さ</h3>
+                <div className="difficulty-picker__options">
+                  {([
+                    { value: "easy" as CpuDifficulty, label: "よわい", desc: "初心者向け" },
+                    { value: "normal" as CpuDifficulty, label: "ふつう", desc: "バランス型" },
+                    { value: "hard" as CpuDifficulty, label: "つよい", desc: "上級者向け" },
+                  ]).map((opt) => (
+                    <button
+                      key={opt.value}
+                      className={`option-card ${cpuDifficulty === opt.value ? "option-card--active" : ""}`}
+                      onClick={() => setCpuDifficulty(opt.value)}
+                    >
+                      <span className="option-card__label">{opt.label}</span>
+                      <span className="option-card__desc">{opt.desc}</span>
+                    </button>
+                  ))}
+                </div>
+                <button
+                  className="start-btn"
+                  onClick={() => {
+                    setShowDifficultyPicker(false);
+                    setScreen("categorySelect");
+                  }}
+                >
+                  つぎへ
+                </button>
+              </div>
+            )}
+          </div>
 
-          {isAdmin && (
-            <button
-              className="start-btn start-btn--admin"
-              onClick={() => setScreen("admin")}
-            >
-              管理者画面
-            </button>
-          )}
+          {/* カードグループ */}
+          <div className="title-screen__group">
+            <h2 className="title-screen__group-title">カード</h2>
+            <div className="title-screen__group-btns">
+              <button
+                className="start-btn start-btn--gacha"
+                onClick={() => setScreen("gacha")}
+              >
+                ガチャ
+              </button>
 
-          <button
-            className="start-btn start-btn--logout"
-            onClick={handleLogout}
-          >
-            ログアウト
-          </button>
+              <button
+                className="start-btn start-btn--deck"
+                onClick={() => setScreen("deckEdit")}
+              >
+                デッキ構築
+              </button>
+
+              <button
+                className="start-btn start-btn--collection"
+                onClick={() => setScreen("collection")}
+              >
+                コレクション
+              </button>
+            </div>
+          </div>
+
+          {/* その他グループ */}
+          <div className="title-screen__group title-screen__group--other">
+            <div className="title-screen__group-btns">
+              <button
+                className="start-btn start-btn--secondary"
+                onClick={() => setScreen("ranking")}
+              >
+                ランキング
+              </button>
+
+              <button
+                className="start-btn start-btn--secondary"
+                onClick={() => setScreen("tutorial")}
+              >
+                あそびかた
+              </button>
+
+              {isAdmin && (
+                <button
+                  className="start-btn start-btn--admin"
+                  onClick={() => setScreen("admin")}
+                >
+                  管理者画面
+                </button>
+              )}
+
+              <button
+                className="start-btn start-btn--logout"
+                onClick={handleLogout}
+              >
+                ログアウト
+              </button>
+            </div>
+          </div>
 
           {message && <p className="error-msg">{message}</p>}
-
-          <RankingPanel selectedCategory={selectedCategory} currentUserId={userId} />
         </div>
       </div>
     );
@@ -1021,33 +1666,125 @@ export default function App() {
   // 結果画面
   if (screen === "result" && gameState) {
     const isBattleResult = battleState !== null;
-    const playerWin = isBattleResult && gameState.score > battleState.cpuScore;
-    const cpuWin = isBattleResult && gameState.score < battleState.cpuScore;
+    const isPvpResult = pvpBattleState !== null;
+    const isHpBattle = battleState?.battleType === "hp" || pvpBattleState?.battleType === "hp";
+
+    let player1Win = false;
+    let player2Win = false;
+
+    if (isPvpResult && pvpBattleState) {
+      const p1 = pvpBattleState.player1;
+      const p2 = pvpBattleState.player2;
+      if (pvpBattleState.battleType === "hp") {
+        if (p2.hp <= 0) { player1Win = true; }
+        else if (p1.hp <= 0) { player2Win = true; }
+        else { player1Win = p1.hp > p2.hp; player2Win = p1.hp < p2.hp; }
+      } else {
+        player1Win = p1.score > p2.score;
+        player2Win = p1.score < p2.score;
+      }
+    }
+
+    let playerWin = false;
+    let cpuWin = false;
+
+    if (isBattleResult && battleState) {
+      if (isHpBattle) {
+        if (battleState.cpuHp <= 0) { playerWin = true; }
+        else if (battleState.playerHp <= 0) { cpuWin = true; }
+        else { playerWin = battleState.playerHp > battleState.cpuHp; cpuWin = battleState.playerHp < battleState.cpuHp; }
+      } else {
+        playerWin = gameState.score > (battleState?.cpuScore ?? 0);
+        cpuWin = gameState.score < (battleState?.cpuScore ?? 0);
+      }
+    }
 
     return (
       <div className="app app--result">
         <div className="result-screen">
           <h1>ゲーム終了！</h1>
 
-          {isBattleResult && (
+          {/* PvP結果 */}
+          {isPvpResult && pvpBattleState && (
+            <>
+              <h2 className={`result-screen__battle-result ${player1Win ? "result-screen__battle-result--win" : player2Win ? "result-screen__battle-result--lose" : "result-screen__battle-result--draw"}`}>
+                {player1Win
+                  ? `${pvpBattleState.player1.name} の勝ち！`
+                  : player2Win
+                  ? `${pvpBattleState.player2.name} の勝ち！`
+                  : "引き分け！"}
+              </h2>
+
+              {pvpBattleState.battleType === "hp" ? (
+                <div className="result-screen__hp-display">
+                  <div className="result-screen__hp-bar-wrapper">
+                    <strong className="result-screen__battle-player">{pvpBattleState.player1.name}</strong>
+                    <div className="result-screen__hp-bar">
+                      <div className="result-screen__hp-fill--player" style={{ width: `${Math.max(0, (pvpBattleState.player1.hp / pvpBattleState.maxHp) * 100)}%` }} />
+                    </div>
+                    <span>HP {pvpBattleState.player1.hp} / {pvpBattleState.maxHp}</span>
+                  </div>
+                  <div className="result-screen__hp-bar-wrapper">
+                    <strong className="result-screen__battle-cpu">{pvpBattleState.player2.name}</strong>
+                    <div className="result-screen__hp-bar">
+                      <div className="result-screen__hp-fill--cpu" style={{ width: `${Math.max(0, (pvpBattleState.player2.hp / pvpBattleState.maxHp) * 100)}%` }} />
+                    </div>
+                    <span>HP {pvpBattleState.player2.hp} / {pvpBattleState.maxHp}</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="result-screen__battle-scores">
+                  <div className="result-screen__battle-player">
+                    <strong>{pvpBattleState.player1.name}</strong>: {pvpBattleState.player1.score}点
+                  </div>
+                  <div className="result-screen__battle-cpu">
+                    <strong>{pvpBattleState.player2.name}</strong>: {pvpBattleState.player2.score}点
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* CPU対戦結果 */}
+          {isBattleResult && !isPvpResult && (
             <>
               <h2 className={`result-screen__battle-result ${playerWin ? "result-screen__battle-result--win" : cpuWin ? "result-screen__battle-result--lose" : "result-screen__battle-result--draw"}`}>
                 {playerWin ? "あなたの勝ち！" : cpuWin ? "CPUの勝ち..." : "引き分け！"}
               </h2>
-              <div className="result-screen__battle-scores">
-                <div className="result-screen__battle-player">
-                  <strong>You</strong>: {gameState.score}点
+
+              {isHpBattle && battleState ? (
+                <div className="result-screen__hp-display">
+                  <div className="result-screen__hp-bar-wrapper">
+                    <strong className="result-screen__battle-player">You</strong>
+                    <div className="result-screen__hp-bar">
+                      <div className="result-screen__hp-fill--player" style={{ width: `${Math.max(0, (battleState.playerHp / battleState.maxHp) * 100)}%` }} />
+                    </div>
+                    <span>HP {battleState.playerHp} / {battleState.maxHp}</span>
+                  </div>
+                  <div className="result-screen__hp-bar-wrapper">
+                    <strong className="result-screen__battle-cpu">CPU</strong>
+                    <div className="result-screen__hp-bar">
+                      <div className="result-screen__hp-fill--cpu" style={{ width: `${Math.max(0, (battleState.cpuHp / battleState.maxHp) * 100)}%` }} />
+                    </div>
+                    <span>HP {battleState.cpuHp} / {battleState.maxHp}</span>
+                  </div>
                 </div>
-                <div className="result-screen__battle-cpu">
-                  <strong>CPU</strong>: {battleState.cpuScore}点
+              ) : (
+                <div className="result-screen__battle-scores">
+                  <div className="result-screen__battle-player">
+                    <strong>You</strong>: {gameState.score}点
+                  </div>
+                  <div className="result-screen__battle-cpu">
+                    <strong>CPU</strong>: {battleState?.cpuScore ?? 0}点
+                  </div>
                 </div>
-              </div>
+              )}
             </>
           )}
 
           <p className="result-screen__category">ステージ: {CATEGORY_LABELS[gameState.category]}</p>
 
-          {!isBattleResult && (
+          {!isBattleResult && !isPvpResult && (
             <>
               <p className="result-screen__score">
                 スコア: <strong>{gameState.score}</strong> 点
@@ -1058,7 +1795,7 @@ export default function App() {
 
           {gameState.wordHistory.length > 0 && (
             <div className="result-screen__words">
-              <h3>{isBattleResult ? "あなたの単語" : "使った単語（学習ログ）"}</h3>
+              <h3>{(isBattleResult || isPvpResult) ? "あなたの単語" : "使った単語（学習ログ）"}</h3>
               <ul className="result-screen__word-list">
                 {[...new Set(gameState.wordHistory)].map((w) => (
                   <li key={w} className="result-screen__word-item">{w}</li>
@@ -1067,7 +1804,7 @@ export default function App() {
             </div>
           )}
 
-          {isBattleResult && battleState.cpuWordHistory.length > 0 && (
+          {isBattleResult && !isPvpResult && battleState.cpuWordHistory.length > 0 && (
             <div className="result-screen__words">
               <h3>CPUの単語</h3>
               <ul className="result-screen__word-list">
@@ -1076,6 +1813,27 @@ export default function App() {
                 ))}
               </ul>
             </div>
+          )}
+
+          {isPvpResult && pvpBattleState && (
+            <>
+              <div className="result-screen__words">
+                <h3>{pvpBattleState.player1.name} の単語</h3>
+                <ul className="result-screen__word-list">
+                  {[...new Set(pvpBattleState.player1.wordHistory)].map((w) => (
+                    <li key={w} className="result-screen__word-item">{w}</li>
+                  ))}
+                </ul>
+              </div>
+              <div className="result-screen__words">
+                <h3>{pvpBattleState.player2.name} の単語</h3>
+                <ul className="result-screen__word-list">
+                  {[...new Set(pvpBattleState.player2.wordHistory)].map((w) => (
+                    <li key={w} className="result-screen__word-item">{w}</li>
+                  ))}
+                </ul>
+              </div>
+            </>
           )}
 
           <button className="start-btn" onClick={returnToTitle}>
@@ -1089,6 +1847,12 @@ export default function App() {
   // ゲーム画面
   if (!gameState) return null;
 
+  // PvP: オンライン対戦で相手ターン中は操作無効
+  const isOnlineOpponentTurn = pvpBattleState?.mode === "online_pvp"
+    && pvpBattleState.myRole
+    && pvpBattleState.turnOwner !== pvpBattleState.myRole;
+  const allDisabled = cpuThinking || showTurnInterstitial || !!isOnlineOpponentTurn;
+
   return (
     <div className="app app--game">
       <div className="game-screen">
@@ -1100,10 +1864,32 @@ export default function App() {
           timeRemaining={timeRemaining}
           bagCount={gameState.bag.length}
           battleMode={battleState !== null}
+          battleType={battleState?.battleType ?? pvpBattleState?.battleType}
           cpuScore={battleState?.cpuScore}
           turnOwner={battleState?.turnOwner}
-          battleTurn={battleState?.battleTurn}
+          battleTurn={battleState?.battleTurn ?? pvpBattleState?.battleTurn}
+          playerHp={battleState?.playerHp}
+          cpuHp={battleState?.cpuHp}
+          maxHp={battleState?.maxHp ?? pvpBattleState?.maxHp}
+          pvpMode={pvpBattleState !== null}
+          pvpTurnOwner={pvpBattleState?.turnOwner}
+          player1Name={pvpBattleState?.player1.name}
+          player1Score={pvpBattleState?.player1.score}
+          player2Name={pvpBattleState?.player2.name}
+          player2Score={pvpBattleState?.player2.score}
+          player1Hp={pvpBattleState?.player1.hp}
+          player2Hp={pvpBattleState?.player2.hp}
+          isMyTurn={pvpBattleState?.mode === "online_pvp" ? !isOnlineOpponentTurn : undefined}
         />
+
+        {/* PvP: 現在のターン表示バナー */}
+        {pvpBattleState && !showTurnInterstitial && (
+          <div className={`pvp-turn-banner pvp-turn-banner--${pvpBattleState.turnOwner}`}>
+            {pvpBattleState.mode === "online_pvp" && isOnlineOpponentTurn
+              ? `${getCurrentPlayer(pvpBattleState).name} のターン… 待機中`
+              : `${getCurrentPlayer(pvpBattleState).name} のターン`}
+          </div>
+        )}
 
         {message && (
           <div className={`game-message ${cpuThinking ? "game-message--cpu" : message.includes("CPU") ? "game-message--cpu" : message.includes("点") ? "game-message--success" : message.includes("パス") ? "game-message--info" : "game-message--error"}`}>
@@ -1121,7 +1907,8 @@ export default function App() {
           board={gameState.board}
           onCellClick={handleCellClick}
           onDropTile={handleDropOnCell}
-          cpuHighlightCells={battleState?.cpuHighlightCells}
+          cpuHighlightCells={battleState?.cpuHighlightCells ?? pvpBattleState?.highlightCells}
+          disabled={allDisabled}
         />
 
         <NormalRack
@@ -1131,12 +1918,14 @@ export default function App() {
             gameState.placedThisTurn.filter((p) => p.rackIndex >= 0).map((p) => p.rackIndex)
           )}
           onSelect={selectRackTile}
+          disabled={allDisabled}
         />
 
         <FreeCardPanel
           freePool={gameState.freePool}
           selectedLetter={selectedFreeLetter}
           onSelect={selectFreeLetter}
+          disabled={allDisabled}
         />
 
         {(gameState.specialHand.length > 0 || gameState.specialSet !== null) && (
@@ -1146,6 +1935,7 @@ export default function App() {
             onSetCard={handleSetSpecial}
             onUnsetCard={handleUnsetSpecial}
             lastSpecialCategory={gameState.lastSpecialCategory}
+            disabled={allDisabled}
           />
         )}
 
@@ -1159,7 +1949,15 @@ export default function App() {
           canUndo={gameState.placedThisTurn.length > 0}
           spellCheckRemaining={gameState.spellCheckRemaining}
           spellHistoryCount={spellHistory.length}
-          allDisabled={cpuThinking}
+          allDisabled={allDisabled}
+        />
+
+        <TurnHistory
+          entries={gameState.turnHistory}
+          battleMode={battleState !== null || pvpBattleState !== null}
+          battleType={battleState?.battleType ?? pvpBattleState?.battleType}
+          player1Name={pvpBattleState?.player1.name}
+          player2Name={pvpBattleState?.player2.name}
         />
 
         {showSpellCheck && (
@@ -1171,6 +1969,30 @@ export default function App() {
             onAddHistory={(entry) => setSpellHistory((prev) => [...prev, entry])}
             onClose={() => setShowSpellCheck(false)}
           />
+        )}
+
+        {/* ローカルPvP ターン切替インタースティシャル */}
+        {showTurnInterstitial && pvpBattleState && (
+          <div className="turn-interstitial">
+            <div className="turn-interstitial__text">
+              <span className={`turn-interstitial__player--${pvpBattleState.turnOwner}`}>
+                {getCurrentPlayer(pvpBattleState).name}
+              </span>
+              {" のターンです"}
+            </div>
+            <button
+              className="turn-interstitial__btn"
+              onClick={() => {
+                // rack を次プレイヤーに入れ替え
+                const swapped = swapRackForTurn(gameState, pvpBattleState);
+                setGameState(swapped);
+                setShowTurnInterstitial(false);
+                startTimer();
+              }}
+            >
+              準備OK
+            </button>
+          </div>
         )}
       </div>
     </div>

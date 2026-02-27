@@ -11,6 +11,7 @@ interface BoardProps {
   onDropTile?: (x: number, y: number, data: string) => void;
   /** CPU が直前に置いたセル（ハイライト用） */
   cpuHighlightCells?: { x: number; y: number }[];
+  disabled?: boolean;
 }
 
 function multiplierLabel(m: Cell["multiplier"]): string {
@@ -23,7 +24,7 @@ function multiplierLabel(m: Cell["multiplier"]): string {
   }
 }
 
-export function Board({ board, onCellClick, onDropTile, cpuHighlightCells }: BoardProps) {
+export function Board({ board, onCellClick, onDropTile, cpuHighlightCells, disabled }: BoardProps) {
   const size = board.length;
 
   const cpuSet = new Set(
@@ -32,7 +33,7 @@ export function Board({ board, onCellClick, onDropTile, cpuHighlightCells }: Boa
 
   return (
     <div
-      className="board"
+      className={`board${disabled ? " board--disabled" : ""}`}
       style={{
         gridTemplateColumns: `repeat(${size}, 1fr)`,
         gridTemplateRows: `repeat(${size}, 1fr)`,
@@ -57,9 +58,9 @@ export function Board({ board, onCellClick, onDropTile, cpuHighlightCells }: Boa
               ]
                 .filter(Boolean)
                 .join(" ")}
-              onClick={() => onCellClick(x, y)}
+              onClick={() => { if (!disabled) onCellClick(x, y); }}
               onDragOver={(e) => {
-                if (cell.char === null && cell.pending === null) {
+                if (!disabled && cell.char === null && cell.pending === null) {
                   e.preventDefault();
                   e.currentTarget.classList.add("cell--dragover");
                 }
@@ -70,6 +71,7 @@ export function Board({ board, onCellClick, onDropTile, cpuHighlightCells }: Boa
               onDrop={(e) => {
                 e.preventDefault();
                 e.currentTarget.classList.remove("cell--dragover");
+                if (disabled) return;
                 const data = e.dataTransfer.getData("text/plain");
                 if (data && onDropTile) {
                   onDropTile(x, y, data);

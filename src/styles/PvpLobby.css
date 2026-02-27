@@ -1,0 +1,212 @@
+/* ========================================
+   ローカルPvP ロビー
+   ======================================== */
+
+.pvp-lobby {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 32px 20px;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.pvp-lobby__title {
+  font-size: 1.4rem;
+  color: #1a237e;
+  margin: 0;
+}
+
+.pvp-lobby__desc {
+  font-size: 0.85rem;
+  color: #78909c;
+  margin: 0;
+}
+
+.pvp-lobby__inputs {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.pvp-lobby__label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
+.pvp-lobby__label-text {
+  font-size: 0.8rem;
+  font-weight: bold;
+}
+
+.pvp-lobby__label-text--p1 {
+  color: #1565c0;
+}
+
+.pvp-lobby__label-text--p2 {
+  color: #e65100;
+}
+
+.pvp-lobby__input {
+  padding: 10px 14px;
+  border: 1px solid #cfd8dc;
+  border-radius: 8px;
+  font-size: 1rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.pvp-lobby__input:focus {
+  border-color: #42a5f5;
+}
+
+.pvp-lobby__vs {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #90a4ae;
+}
+
+/* ========================================
+   オンラインPvP ロビー
+   ======================================== */
+
+.online-lobby {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 32px 20px;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.online-lobby__title {
+  font-size: 1.4rem;
+  color: #1a237e;
+  margin: 0;
+}
+
+.online-lobby__desc {
+  font-size: 0.85rem;
+  color: #78909c;
+  margin: 0;
+}
+
+.online-lobby__section {
+  width: 100%;
+  padding: 16px;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.online-lobby__section-title {
+  font-size: 0.9rem;
+  font-weight: bold;
+  color: #37474f;
+  margin: 0 0 12px;
+}
+
+.online-lobby__code-display {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.online-lobby__code {
+  font-size: 2rem;
+  font-weight: bold;
+  font-family: monospace;
+  letter-spacing: 0.3em;
+  color: #1565c0;
+  background: #e3f2fd;
+  padding: 8px 20px;
+  border-radius: 8px;
+}
+
+.online-lobby__waiting {
+  font-size: 0.85rem;
+  color: #78909c;
+  text-align: center;
+  margin-top: 8px;
+}
+
+.online-lobby__join-form {
+  display: flex;
+  gap: 8px;
+}
+
+.online-lobby__code-input {
+  flex: 1;
+  padding: 10px 14px;
+  border: 1px solid #cfd8dc;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-family: monospace;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.online-lobby__code-input:focus {
+  border-color: #42a5f5;
+}
+
+.online-lobby__join-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  background: #e65100;
+  color: #fff;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.online-lobby__join-btn:hover {
+  background: #bf360c;
+}
+
+.online-lobby__join-btn:disabled {
+  background: #bdbdbd;
+  cursor: not-allowed;
+}
+
+.online-lobby__error {
+  color: #d32f2f;
+  font-size: 0.8rem;
+  margin-top: 4px;
+}
+
+.online-lobby__divider {
+  width: 100%;
+  text-align: center;
+  font-size: 0.8rem;
+  color: #bdbdbd;
+  margin: 4px 0;
+}
+
+/* モバイル対応 */
+@media (max-width: 600px) {
+  .pvp-lobby,
+  .online-lobby {
+    padding: 20px 12px;
+  }
+
+  .online-lobby__code {
+    font-size: 1.5rem;
+    padding: 6px 14px;
+  }
+
+  .online-lobby__join-form {
+    flex-direction: column;
+  }
+}

@@ -217,6 +217,199 @@
   margin-bottom: 16px;
 }
 
+/* --- タイトル画面グループ --- */
+.title-screen__group {
+  width: 100%;
+  padding: 16px;
+  margin-bottom: 12px;
+  background: rgba(255, 255, 255, 0.35);
+  border-radius: 16px;
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+.title-screen__group-title {
+  font-size: 0.85rem;
+  color: #546e7a;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin: 0 0 10px;
+  font-weight: bold;
+}
+
+.title-screen__group-btns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.title-screen__group-btns .start-btn {
+  margin: 0;
+  font-size: 1rem;
+  padding: 12px 10px;
+}
+
+.title-screen__group--other {
+  background: transparent;
+  border: none;
+  padding: 8px 0 0;
+  backdrop-filter: none;
+}
+
+.title-screen__group--other .title-screen__group-btns {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.title-screen__group--other .start-btn {
+  font-size: 0.85rem;
+  padding: 8px 18px;
+}
+
+/* --- ランキング画面 --- */
+.ranking-screen {
+  text-align: center;
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+
+.ranking-screen__heading {
+  font-size: 1.6rem;
+  color: #1a237e;
+  margin-bottom: 16px;
+}
+
+/* --- ソロプレイ / CPU対戦ボタン --- */
+.start-btn--solo {
+  background: #1565c0;
+}
+
+.start-btn--solo:hover {
+  background: #0d47a1;
+}
+
+.start-btn--battle {
+  background: #e65100;
+}
+
+.start-btn--battle:hover {
+  background: #bf360c;
+}
+
+.start-btn--local-pvp {
+  background: #2e7d32;
+}
+
+.start-btn--local-pvp:hover {
+  background: #1b5e20;
+}
+
+.start-btn--online-pvp {
+  background: #6a1b9a;
+}
+
+.start-btn--online-pvp:hover {
+  background: #4a148c;
+}
+
+/* --- ターン切替インタースティシャル --- */
+.turn-interstitial {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 1000;
+  backdrop-filter: blur(6px);
+}
+
+.turn-interstitial__text {
+  font-size: 1.6rem;
+  font-weight: bold;
+  color: #fff;
+}
+
+.turn-interstitial__player--player1 {
+  color: #42a5f5;
+}
+
+.turn-interstitial__player--player2 {
+  color: #ff9800;
+}
+
+.turn-interstitial__btn {
+  padding: 14px 40px;
+  border: none;
+  border-radius: 12px;
+  background: #fff;
+  color: #37474f;
+  font-size: 1.1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.turn-interstitial__btn:hover {
+  background: #e0e0e0;
+}
+
+/* --- PvP ターンバナー --- */
+.pvp-turn-banner {
+  width: 100%;
+  text-align: center;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: bold;
+  animation: pvp-turn-pulse 1.5s ease-in-out infinite;
+}
+
+.pvp-turn-banner--player1 {
+  background: rgba(21, 101, 192, 0.12);
+  color: #1565c0;
+  border: 2px solid #42a5f5;
+}
+
+.pvp-turn-banner--player2 {
+  background: rgba(230, 81, 0, 0.12);
+  color: #e65100;
+  border: 2px solid #ff9800;
+}
+
+@keyframes pvp-turn-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* --- 難易度ピッカー --- */
+.difficulty-picker {
+  margin: 16px 0;
+  padding: 16px;
+  background: rgba(255,255,255,0.5);
+  border-radius: 14px;
+  backdrop-filter: blur(4px);
+}
+
+.difficulty-picker__title {
+  font-size: 1rem;
+  color: #1a237e;
+  margin-bottom: 12px;
+}
+
+.difficulty-picker__options {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
 .app--login {
   background: linear-gradient(160deg, #e8eaf6 0%, #c5cae9 30%, #9fa8da 70%, #7986cb 100%);
   align-items: center;
@@ -498,6 +691,13 @@
   padding: 2px 8px;
   border-radius: 4px;
   background: #e8eaf6;
+  box-shadow: 0 0 0 2px #5c6bc0;
+  animation: header-active-glow 1.5s ease-in-out infinite;
+}
+
+@keyframes header-active-glow {
+  0%, 100% { box-shadow: 0 0 0 2px #5c6bc0; }
+  50% { box-shadow: 0 0 6px 2px #7986cb; }
 }
 
 .game-header__vs {
@@ -538,6 +738,108 @@
 
 .result-screen__battle-cpu {
   color: #e65100;
+}
+
+/* --- HPバトル用ヘッダー --- */
+.game-header--hp {
+  flex-wrap: wrap;
+}
+
+.game-header__hp-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.game-header__hp-group--active {
+  background: #e8eaf6;
+  box-shadow: 0 0 0 2px #5c6bc0;
+  border-radius: 6px;
+  animation: header-active-glow 1.5s ease-in-out infinite;
+}
+
+.game-header__hp-label {
+  font-weight: bold;
+  font-size: 0.8rem;
+  min-width: 28px;
+}
+
+.game-header__hp-group--player .game-header__hp-label {
+  color: #1565c0;
+}
+
+.game-header__hp-group--cpu .game-header__hp-label {
+  color: #e65100;
+}
+
+.game-header__hp-bar {
+  width: 80px;
+  height: 10px;
+  background: #eceff1;
+  border-radius: 5px;
+  overflow: hidden;
+  border: 1px solid #cfd8dc;
+}
+
+.game-header__hp-fill {
+  height: 100%;
+  border-radius: 5px;
+  transition: width 0.4s ease;
+}
+
+.game-header__hp-fill--player {
+  background: linear-gradient(90deg, #42a5f5, #1565c0);
+}
+
+.game-header__hp-fill--cpu {
+  background: linear-gradient(90deg, #ff7043, #e65100);
+}
+
+.game-header__hp-value {
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  min-width: 48px;
+  text-align: right;
+}
+
+/* --- HP結果画面 --- */
+.result-screen__hp-display {
+  display: flex;
+  gap: 24px;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.result-screen__hp-bar-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.result-screen__hp-bar {
+  width: 120px;
+  height: 14px;
+  background: #eceff1;
+  border-radius: 7px;
+  overflow: hidden;
+  border: 1px solid #cfd8dc;
+}
+
+.result-screen__hp-fill--player {
+  height: 100%;
+  border-radius: 7px;
+  background: linear-gradient(90deg, #42a5f5, #1565c0);
+  transition: width 0.4s ease;
+}
+
+.result-screen__hp-fill--cpu {
+  height: 100%;
+  border-radius: 7px;
+  background: linear-gradient(90deg, #ff7043, #e65100);
+  transition: width 0.4s ease;
 }
 
 /* CPU 考え中メッセージ */
@@ -639,9 +941,33 @@
     margin: 6px auto;
   }
 
+  .title-screen__group {
+    padding: 12px;
+    margin-bottom: 8px;
+  }
+
+  .title-screen__group-btns .start-btn {
+    font-size: 0.85rem;
+    padding: 10px 6px;
+  }
+
   .start-btn--logout {
     font-size: 0.8rem;
     padding: 6px 16px;
+  }
+
+  .difficulty-picker {
+    margin: 8px 0;
+    padding: 10px;
+  }
+
+  .difficulty-picker__title {
+    font-size: 0.85rem;
+    margin-bottom: 8px;
+  }
+
+  .difficulty-picker__options {
+    gap: 6px;
   }
 
   .title-screen__user {
@@ -710,6 +1036,21 @@
     gap: 6px;
     font-size: 0.75rem;
     padding: 4px 8px;
+  }
+
+  .game-header__hp-bar {
+    width: 56px;
+    height: 8px;
+  }
+
+  .game-header__hp-value {
+    font-size: 0.65rem;
+    min-width: 40px;
+  }
+
+  .game-header__hp-label {
+    font-size: 0.7rem;
+    min-width: 24px;
   }
 
   .game-message {

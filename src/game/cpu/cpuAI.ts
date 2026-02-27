@@ -2,7 +2,7 @@
  * CPU AI — 盤面とラックから最善手を探索する
  */
 
-import type { Cell, Placement, BoardLayout, CpuCandidate } from "../types";
+import type { Cell, Placement, BoardLayout, CpuCandidate, CpuDifficulty } from "../types";
 import { cloneBoard } from "../core/helpers";
 import { extractFormedWords } from "../core/extractWords";
 import { scoreMove } from "../core/scoreMove";
@@ -17,7 +17,8 @@ export function findBestMove(
   cpuRack: string[],
   dict: Set<string>,
   layout: BoardLayout,
-  letterLimit?: number | null
+  letterLimit?: number | null,
+  difficulty: CpuDifficulty = "normal"
 ): CpuCandidate | null {
   const size = board.length;
   const boardHasConfirmed = board.some((row) =>
@@ -66,11 +67,27 @@ export function findBestMove(
     : candidates;
   if (filtered.length === 0) return null;
 
-  // スコア降順ソートし、上位5件からランダム選択（適度な強さ）
+  // 難易度に応じた候補選択
   filtered.sort((a, b) => b.score - a.score);
-  const topN = Math.min(5, filtered.length);
-  const pick = Math.floor(Math.random() * topN);
-  return filtered[pick];
+
+  switch (difficulty) {
+    case "easy": {
+      // 下位半分からランダム選択（弱い手を打つ）
+      const bottomStart = Math.floor(filtered.length / 2);
+      const bottomHalf = filtered.slice(bottomStart);
+      if (bottomHalf.length === 0) return filtered[filtered.length - 1];
+      return bottomHalf[Math.floor(Math.random() * bottomHalf.length)];
+    }
+    case "hard":
+      // 常に最高スコアの手を選択
+      return filtered[0];
+    case "normal":
+    default: {
+      // 上位5件からランダム選択（適度な強さ）
+      const topN = Math.min(5, filtered.length);
+      return filtered[Math.floor(Math.random() * topN)];
+    }
+  }
 }
 
 /**
