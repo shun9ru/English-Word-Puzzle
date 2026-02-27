@@ -10,7 +10,6 @@ import type {
   BattleType,
   Category,
   SpecialCard,
-  PoisonState,
 } from "../types";
 import type { MoveResult } from "../core/applyMove";
 import { cloneBoard, createFreePool } from "../core/helpers";

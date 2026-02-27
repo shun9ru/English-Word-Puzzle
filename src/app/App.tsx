@@ -611,8 +611,8 @@ export default function App() {
           } else {
             battle = { ...battle, cpuScore: Math.max(0, battle.cpuScore - battle.cpuPoison.damage) };
           }
-          const remaining = battle.cpuPoison.turnsLeft - 1;
-          battle = { ...battle, cpuPoison: remaining > 0 ? { ...battle.cpuPoison, turnsLeft: remaining } : null };
+          const remaining = battle.cpuPoison!.turnsLeft - 1;
+          battle = { ...battle, cpuPoison: remaining > 0 ? { damage: battle.cpuPoison!.damage, turnsLeft: remaining } : null };
         }
         // CPUターン開始: シールド・ミラー減衰
         if (battle.cpuShield > 0) battle = { ...battle, cpuShield: battle.cpuShield - 1 };
@@ -688,8 +688,8 @@ export default function App() {
             result.newBattle = { ...result.newBattle, playerHp: Math.max(0, result.newBattle.playerHp - result.newBattle.playerPoison.damage) };
           }
           // スコアバトルでのプレイヤー毒は playerScore に影響（GameState.score で管理）
-          const pRemaining = result.newBattle.playerPoison.turnsLeft - 1;
-          result.newBattle = { ...result.newBattle, playerPoison: pRemaining > 0 ? { ...result.newBattle.playerPoison, turnsLeft: pRemaining } : null };
+          const pRemaining = result.newBattle.playerPoison!.turnsLeft - 1;
+          result.newBattle = { ...result.newBattle, playerPoison: pRemaining > 0 ? { damage: result.newBattle.playerPoison!.damage, turnsLeft: pRemaining } : null };
         }
         // プレイヤーターン開始: シールド・ミラー減衰
         if (result.newBattle.playerShield > 0) result.newBattle = { ...result.newBattle, playerShield: result.newBattle.playerShield - 1 };
@@ -1519,7 +1519,7 @@ export default function App() {
           player2UserId={gameMode === "local_pvp" ? (p2UserId ?? undefined) : undefined}
           player2Name={gameMode === "local_pvp" ? pvpPlayer2Name : undefined}
           roomId={gameMode === "online_pvp" ? (onlineRoomId ?? undefined) : undefined}
-          isHost={isOnlineHost ?? false}
+          isHost={isOnlineHost === true}
           starting={loading}
           errorMessage={message}
           onConfirm={(p1Slot, p2Slot) => {

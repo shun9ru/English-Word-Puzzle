@@ -2,6 +2,7 @@
  * ゲームヘッダー（スコア、ターン、タイマー、カテゴリ表示）
  */
 
+import type { ReactElement } from "react";
 import type { Category, TurnOwner, BattleType, PvpTurnOwner, PoisonState } from "../game/types";
 
 const CATEGORY_LABELS: Record<Category, string> = {
@@ -20,7 +21,7 @@ interface StatusEffects {
 
 function StatusIcons({ effects }: { effects?: StatusEffects }) {
   if (!effects) return null;
-  const icons: JSX.Element[] = [];
+  const icons: ReactElement[] = [];
   if (effects.shield && effects.shield > 0) {
     icons.push(<span key="shield" className="game-header__status game-header__status--shield" title={`Shield: ${effects.shield}t`}>&#x1f6e1;{effects.shield}</span>);
   }
