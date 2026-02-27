@@ -2,6 +2,7 @@
  * ノーマルカード手札（7枚）
  */
 
+import { useTouchDragSource } from "../hooks/useTouchDrag";
 import "../styles/Rack.css";
 
 interface NormalRackProps {
@@ -13,6 +14,8 @@ interface NormalRackProps {
 }
 
 export function NormalRack({ tiles, selectedIndex, usedIndices, onSelect, disabled }: NormalRackProps) {
+  const startTouchDrag = useTouchDragSource();
+
   return (
     <div className="rack">
       <div className="rack__label">ノーマル (3pt)</div>
@@ -38,6 +41,9 @@ export function NormalRack({ tiles, selectedIndex, usedIndices, onSelect, disabl
               }}
               onDragEnd={(e) => {
                 e.currentTarget.classList.remove("rack__tile--dragging");
+              }}
+              onTouchStart={(e) => {
+                if (!disabled && !used) startTouchDrag(e, `normal:${i}`);
               }}
             >
               {used ? "" : ch}

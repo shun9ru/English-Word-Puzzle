@@ -42,6 +42,10 @@
   padding: 0;
 }
 
+.free-cards__btn:not(:disabled) {
+  touch-action: none;
+}
+
 .free-cards__btn:hover:not(:disabled) {
   border-color: #5c6bc0;
   background: #c5cae9;

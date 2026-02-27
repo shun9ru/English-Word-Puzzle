@@ -3,6 +3,7 @@
  */
 
 import type { Cell } from "../game/types";
+import { useTouchDropTarget } from "../hooks/useTouchDrag";
 import "../styles/Board.css";
 
 interface BoardProps {
@@ -25,6 +26,8 @@ function multiplierLabel(m: Cell["multiplier"]): string {
 }
 
 export function Board({ board, onCellClick, onDropTile, cpuHighlightCells, disabled }: BoardProps) {
+  useTouchDropTarget(disabled ? undefined : onDropTile);
+
   const size = board.length;
 
   const cpuSet = new Set(
@@ -49,6 +52,9 @@ export function Board({ board, onCellClick, onDropTile, cpuHighlightCells, disab
           return (
             <div
               key={`${x}-${y}`}
+              data-cell-x={x}
+              data-cell-y={y}
+              data-droppable={cell.char === null && cell.pending === null ? "true" : "false"}
               className={[
                 "cell",
                 isPending ? "cell--pending" : "",

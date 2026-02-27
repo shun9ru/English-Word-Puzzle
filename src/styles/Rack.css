@@ -52,6 +52,7 @@
 
 .rack__tile[draggable] {
   cursor: grab;
+  touch-action: none;
 }
 
 .rack__tile[draggable]:active {

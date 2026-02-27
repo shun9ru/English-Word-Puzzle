@@ -2,6 +2,7 @@
  * フリーカードパネル（A-Z、各2枚まで）
  */
 
+import { useTouchDragSource } from "../hooks/useTouchDrag";
 import "../styles/FreeCards.css";
 
 const MAX_FREE_USES = 2;
@@ -15,6 +16,8 @@ interface FreeCardPanelProps {
 }
 
 export function FreeCardPanel({ freePool, selectedLetter, onSelect, disabled }: FreeCardPanelProps) {
+  const startTouchDrag = useTouchDragSource();
+
   return (
     <div className="free-cards">
       <div className="free-cards__label">フリー (1pt)</div>
@@ -39,6 +42,9 @@ export function FreeCardPanel({ freePool, selectedLetter, onSelect, disabled }: 
                 if (disabled || exhausted) { e.preventDefault(); return; }
                 e.dataTransfer.setData("text/plain", `free:${letter}`);
                 e.dataTransfer.effectAllowed = "move";
+              }}
+              onTouchStart={(e) => {
+                if (!disabled && !exhausted) startTouchDrag(e, `free:${letter}`);
               }}
             >
               <span className="free-cards__letter">{letter}</span>
