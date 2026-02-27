@@ -2,7 +2,7 @@
  * ゲームヘッダー（スコア、ターン、タイマー、カテゴリ表示）
  */
 
-import type { Category, TurnOwner, BattleType, PvpTurnOwner } from "../game/types";
+import type { Category, TurnOwner, BattleType, PvpTurnOwner, PoisonState } from "../game/types";
 
 const CATEGORY_LABELS: Record<Category, string> = {
   animals: "Animals",
@@ -11,6 +11,28 @@ const CATEGORY_LABELS: Record<Category, string> = {
   hobby: "Hobby",
   all: "All Genre",
 };
+
+interface StatusEffects {
+  shield?: number;
+  poison?: PoisonState | null;
+  mirror?: number;
+}
+
+function StatusIcons({ effects }: { effects?: StatusEffects }) {
+  if (!effects) return null;
+  const icons: JSX.Element[] = [];
+  if (effects.shield && effects.shield > 0) {
+    icons.push(<span key="shield" className="game-header__status game-header__status--shield" title={`Shield: ${effects.shield}t`}>&#x1f6e1;{effects.shield}</span>);
+  }
+  if (effects.poison && effects.poison.turnsLeft > 0) {
+    icons.push(<span key="poison" className="game-header__status game-header__status--poison" title={`Poison: ${effects.poison.damage}dmg x${effects.poison.turnsLeft}t`}>&#x2620;{effects.poison.turnsLeft}</span>);
+  }
+  if (effects.mirror && effects.mirror > 0) {
+    icons.push(<span key="mirror" className="game-header__status game-header__status--mirror" title={`Mirror: ${effects.mirror}t`}>&#x1fa9e;{effects.mirror}</span>);
+  }
+  if (icons.length === 0) return null;
+  return <span className="game-header__statuses">{icons}</span>;
+}
 
 interface GameHeaderProps {
   category: Category;
@@ -29,6 +51,9 @@ interface GameHeaderProps {
   playerHp?: number;
   cpuHp?: number;
   maxHp?: number;
+  /** ステータスエフェクト */
+  playerStatus?: StatusEffects;
+  cpuStatus?: StatusEffects;
   /** PvP モード用 */
   pvpMode?: boolean;
   pvpTurnOwner?: PvpTurnOwner;
@@ -38,6 +63,8 @@ interface GameHeaderProps {
   player2Score?: number;
   player1Hp?: number;
   player2Hp?: number;
+  player1Status?: StatusEffects;
+  player2Status?: StatusEffects;
   isMyTurn?: boolean;
 }
 
@@ -56,6 +83,8 @@ export function GameHeader({
   playerHp,
   cpuHp,
   maxHp,
+  playerStatus,
+  cpuStatus,
   pvpMode,
   pvpTurnOwner,
   player1Name,
@@ -64,6 +93,8 @@ export function GameHeader({
   player2Score,
   player1Hp,
   player2Hp,
+  player1Status,
+  player2Status,
   isMyTurn,
 }: GameHeaderProps) {
   const isLowTime = timeRemaining <= 20;
@@ -90,7 +121,7 @@ export function GameHeader({
           <span className="game-header__category">{CATEGORY_LABELS[category]}</span>
 
           <div className={`game-header__hp-group game-header__hp-group--player ${pvpTurnOwner === "player1" ? "game-header__hp-group--active" : ""}`}>
-            <span className="game-header__hp-label">{p1}</span>
+            <span className="game-header__hp-label">{p1}<StatusIcons effects={player1Status} /></span>
             <div className="game-header__hp-bar">
               <div className="game-header__hp-fill game-header__hp-fill--player" style={{ width: `${p1Pct}%` }} />
             </div>
@@ -100,7 +131,7 @@ export function GameHeader({
           <span className="game-header__vs">vs</span>
 
           <div className={`game-header__hp-group game-header__hp-group--cpu ${pvpTurnOwner === "player2" ? "game-header__hp-group--active" : ""}`}>
-            <span className="game-header__hp-label">{p2}</span>
+            <span className="game-header__hp-label">{p2}<StatusIcons effects={player2Status} /></span>
             <div className="game-header__hp-bar">
               <div className="game-header__hp-fill game-header__hp-fill--cpu" style={{ width: `${p2Pct}%` }} />
             </div>
@@ -121,11 +152,11 @@ export function GameHeader({
       <div className="game-header game-header--battle">
         <span className="game-header__category">{CATEGORY_LABELS[category]}</span>
         <span className={`game-header__score game-header__score--player ${pvpTurnOwner === "player1" ? "game-header__score--active" : ""}`}>
-          {p1}: {player1Score ?? 0}
+          {p1}: {player1Score ?? 0}<StatusIcons effects={player1Status} />
         </span>
         <span className="game-header__vs">vs</span>
         <span className={`game-header__score game-header__score--cpu ${pvpTurnOwner === "player2" ? "game-header__score--active" : ""}`}>
-          {p2}: {player2Score ?? 0}
+          {p2}: {player2Score ?? 0}<StatusIcons effects={player2Status} />
         </span>
         <span className="game-header__turn">{displayTurn} / {maxTurns}</span>
         <span className={`game-header__timer ${isLowTime && isMyTurn !== false ? "game-header__timer--low" : ""}`}>
@@ -155,7 +186,7 @@ export function GameHeader({
           <span className="game-header__category">{CATEGORY_LABELS[category]}</span>
 
           <div className={`game-header__hp-group game-header__hp-group--player ${turnOwner === "player" ? "game-header__hp-group--active" : ""}`}>
-            <span className="game-header__hp-label">You</span>
+            <span className="game-header__hp-label">You<StatusIcons effects={playerStatus} /></span>
             <div className="game-header__hp-bar">
               <div
                 className="game-header__hp-fill game-header__hp-fill--player"
@@ -168,7 +199,7 @@ export function GameHeader({
           <span className="game-header__vs">vs</span>
 
           <div className={`game-header__hp-group game-header__hp-group--cpu ${turnOwner === "cpu" ? "game-header__hp-group--active" : ""}`}>
-            <span className="game-header__hp-label">CPU</span>
+            <span className="game-header__hp-label">CPU<StatusIcons effects={cpuStatus} /></span>
             <div className="game-header__hp-bar">
               <div
                 className="game-header__hp-fill game-header__hp-fill--cpu"
@@ -192,11 +223,11 @@ export function GameHeader({
       <div className="game-header game-header--battle">
         <span className="game-header__category">{CATEGORY_LABELS[category]}</span>
         <span className={`game-header__score game-header__score--player ${turnOwner === "player" ? "game-header__score--active" : ""}`}>
-          You: {score}
+          You: {score}<StatusIcons effects={playerStatus} />
         </span>
         <span className="game-header__vs">vs</span>
         <span className={`game-header__score game-header__score--cpu ${turnOwner === "cpu" ? "game-header__score--active" : ""}`}>
-          CPU: {cpuScore ?? 0}
+          CPU: {cpuScore ?? 0}<StatusIcons effects={cpuStatus} />
         </span>
         <span className="game-header__turn">
           {displayTurn} / {maxTurns}

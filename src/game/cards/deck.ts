@@ -3,7 +3,7 @@
  * データ永続化はSupabaseのcollectionService/userServiceが担当。
  */
 
-import type { SpecialCard } from "../types";
+import type { SpecialCard, SpecialEffectType } from "../types";
 import { shuffle } from "../core/helpers";
 
 /** レベル上限 */
@@ -44,12 +44,59 @@ export function canAddToDeck(deck: SpecialCard[], card: SpecialCard): { ok: bool
 }
 
 /**
- * レベルに応じた効果値を計算。
- * Lv1=基本値、Lv2=+25%、Lv3=+50%、Lv4=+75%、Lv5=+100%（2倍）
+ * レベルに応じた効果値を計算（タイプ別スケーリング）。
+ * effectType を渡すとタイプに応じた適切なスケーリングを適用。
  */
-export function scaledEffectValue(base: number, level: number): number {
-  const multiplier = 1 + (level - 1) * 0.25;
-  return Math.round(base * multiplier * 100) / 100;
+export function scaledEffectValue(base: number, level: number, effectType?: SpecialEffectType): number {
+  const lv = Math.min(Math.max(level, 1), MAX_LEVEL);
+
+  if (!effectType) {
+    // 後方互換: effectType未指定時は旧式計算
+    const multiplier = 1 + (lv - 1) * 0.25;
+    return Math.round(base * multiplier * 100) / 100;
+  }
+
+  switch (effectType) {
+    // 線形スケーリング: base + (lv-1) * step
+    case "bonus_flat":
+    case "reduce_opponent":
+    case "steal_points":
+    case "heal_hp":
+    case "bonus_per_letter":
+    case "poison": {
+      const step = Math.max(1, Math.ceil(base * 0.25));
+      return base + (lv - 1) * step;
+    }
+
+    // 整数テーブル: 小さい整数値用
+    case "draw_normal":
+    case "recover_free":
+    case "draw_special": {
+      const tables: Record<number, number[]> = {
+        1: [1, 1, 2, 2, 3],
+        2: [2, 2, 3, 3, 4],
+        3: [3, 3, 4, 4, 5],
+      };
+      const table = tables[base];
+      if (table) return table[lv - 1];
+      return base + Math.floor((lv - 1) / 2);
+    }
+
+    // 倍率スケーリング: base + (lv-1) * 0.1
+    case "word_multiplier":
+    case "next_turn_mult":
+      return Math.round((base + (lv - 1) * 0.1) * 100) / 100;
+
+    // 持続ターン: base + floor((lv-1)/2)
+    case "shield":
+    case "mirror":
+      return base + Math.floor((lv - 1) / 2);
+
+    // スケーリングなし
+    case "force_letter_count":
+    case "upgrade_bonus":
+      return base;
+  }
 }
 
 /** ゲーム用にデッキをシャッフルして返す */

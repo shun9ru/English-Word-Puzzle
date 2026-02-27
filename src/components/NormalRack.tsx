@@ -11,14 +11,15 @@ interface NormalRackProps {
   usedIndices: Set<number>;
   onSelect: (index: number) => void;
   disabled?: boolean;
+  bagCount?: number;
 }
 
-export function NormalRack({ tiles, selectedIndex, usedIndices, onSelect, disabled }: NormalRackProps) {
+export function NormalRack({ tiles, selectedIndex, usedIndices, onSelect, disabled, bagCount }: NormalRackProps) {
   const startTouchDrag = useTouchDragSource();
 
   return (
     <div className="rack">
-      <div className="rack__label">ノーマル (3pt)</div>
+      <div className="rack__label">ノーマル (3pt){bagCount != null && <span className="rack__remaining"> 山札: {bagCount}</span>}</div>
       <div className="rack__tiles">
         {tiles.map((ch, i) => {
           const used = usedIndices.has(i);

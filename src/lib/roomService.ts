@@ -111,6 +111,33 @@ export async function finishRoom(roomId: string): Promise<void> {
   if (error) throw new Error(`ルーム終了失敗: ${error.message}`);
 }
 
+/** ホストのデッキスロットを保存 */
+export async function setHostDeckSlot(roomId: string, slot: number): Promise<void> {
+  const { error } = await supabase
+    .from("battle_rooms")
+    .update({ host_deck_slot: slot })
+    .eq("id", roomId);
+  if (error) throw new Error(`ホストデッキスロット保存失敗: ${error.message}`);
+}
+
+/** ゲストのデッキスロットを保存 */
+export async function setGuestDeckSlot(roomId: string, slot: number): Promise<void> {
+  const { error } = await supabase
+    .from("battle_rooms")
+    .update({ guest_deck_slot: slot })
+    .eq("id", roomId);
+  if (error) throw new Error(`ゲストデッキスロット保存失敗: ${error.message}`);
+}
+
+/** ルームのゲーム設定を更新（ホストがカテゴリ選択確定時） */
+export async function updateRoomConfig(roomId: string, config: RoomConfig): Promise<void> {
+  const { error } = await supabase
+    .from("battle_rooms")
+    .update({ game_config: config })
+    .eq("id", roomId);
+  if (error) throw new Error(`設定更新失敗: ${error.message}`);
+}
+
 /** Realtime でルームの変更を購読 */
 export function subscribeToRoom(
   roomId: string,

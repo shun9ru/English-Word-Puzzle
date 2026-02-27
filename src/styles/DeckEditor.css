@@ -46,6 +46,47 @@
   border-color: #2e7d32;
 }
 
+/* スロットタブ */
+.deck-editor__slot-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  justify-content: center;
+}
+
+.deck-editor__slot-tab {
+  padding: 6px 12px;
+  border: 2px solid #81c784;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  transition: all 0.15s;
+}
+
+.deck-editor__slot-tab:hover {
+  background: #e8f5e9;
+}
+
+.deck-editor__slot-tab--active {
+  background: #1b5e20;
+  color: #fff;
+  border-color: #1b5e20;
+}
+
+.deck-editor__slot-num {
+  font-size: 0.8rem;
+  font-weight: bold;
+}
+
+.deck-editor__slot-count {
+  font-size: 0.6rem;
+  opacity: 0.8;
+}
+
 .deck-editor__section {
   margin-bottom: 24px;
 }
@@ -182,6 +223,302 @@
   background: #37474f;
 }
 
+/* デッキ名編集 */
+.deck-editor__deck-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.deck-editor__deck-name {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.deck-editor__deck-name:hover {
+  color: #1565c0;
+}
+
+.deck-editor__edit-icon {
+  font-size: 0.75rem;
+  opacity: 0.4;
+}
+
+.deck-editor__deck-name:hover .deck-editor__edit-icon {
+  opacity: 0.8;
+}
+
+.deck-editor__deck-count {
+  font-weight: normal;
+  font-size: 0.9rem;
+  color: #78909c;
+}
+
+.deck-editor__name-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.deck-editor__name-input {
+  font-size: 1rem;
+  font-weight: bold;
+  border: 2px solid #42a5f5;
+  border-radius: 6px;
+  padding: 2px 8px;
+  width: 140px;
+  outline: none;
+  color: #1a237e;
+}
+
+.deck-editor__name-save {
+  font-size: 0.8rem;
+  font-weight: bold;
+  padding: 2px 10px;
+  border: none;
+  border-radius: 6px;
+  background: #42a5f5;
+  color: #fff;
+  cursor: pointer;
+}
+
+.deck-editor__name-save:hover {
+  background: #1e88e5;
+}
+
+/* ========================================
+   カード詳細モーダル
+   ======================================== */
+
+.deck-editor-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.deck-editor-modal {
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px;
+  max-width: 380px;
+  width: 90%;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+.deck-editor-modal__header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.deck-editor-modal__icon {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+}
+
+.deck-editor-modal__header-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.deck-editor-modal__word {
+  font-size: 1.4rem;
+  font-weight: bold;
+  color: #1a237e;
+  letter-spacing: 1px;
+}
+
+.deck-editor-modal__meaning {
+  font-size: 0.9rem;
+  color: #546e7a;
+}
+
+.deck-editor-modal__rarity {
+  font-size: 0.85rem;
+  font-weight: bold;
+}
+
+.deck-editor-modal__battle-tag {
+  font-size: 0.7rem;
+  color: #fff;
+  background: #d32f2f;
+  padding: 1px 8px;
+  border-radius: 10px;
+  align-self: flex-start;
+}
+
+.deck-editor-modal__categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.deck-editor-modal__cat-pill {
+  font-size: 0.7rem;
+  padding: 2px 10px;
+  border-radius: 12px;
+  background: #e8f5e9;
+  color: #2e7d32;
+  font-weight: bold;
+}
+
+.deck-editor-modal__level-section {
+  margin-bottom: 12px;
+}
+
+.deck-editor-modal__level-label {
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: #1565c0;
+}
+
+.deck-editor-modal__copies {
+  margin-top: 4px;
+}
+
+.deck-editor-modal__copies-bar {
+  width: 100%;
+  height: 8px;
+  background: #e0e0e0;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 2px;
+}
+
+.deck-editor-modal__copies-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #42a5f5, #1565c0);
+  border-radius: 4px;
+  transition: width 0.3s;
+}
+
+.deck-editor-modal__copies-text {
+  font-size: 0.8rem;
+  color: #546e7a;
+}
+
+.deck-editor-modal__copies-max {
+  font-size: 0.85rem;
+  color: #e65100;
+  font-weight: bold;
+  margin-left: 8px;
+}
+
+.deck-editor-modal__effect {
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: #f3e5f5;
+  border-radius: 8px;
+}
+
+.deck-editor-modal__effect-label {
+  font-size: 0.75rem;
+  color: #7b1fa2;
+  display: block;
+  margin-bottom: 2px;
+}
+
+.deck-editor-modal__table-wrap {
+  margin-bottom: 16px;
+}
+
+.deck-editor-modal__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.deck-editor-modal__table th {
+  background: #e8eaf6;
+  color: #1a237e;
+  padding: 6px 8px;
+  text-align: left;
+  font-size: 0.75rem;
+}
+
+.deck-editor-modal__table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #eceff1;
+  color: #37474f;
+}
+
+.deck-editor-modal__table-row--current {
+  background: #e3f2fd;
+  font-weight: bold;
+}
+
+.deck-editor-modal__table-row--current td {
+  color: #1565c0;
+}
+
+.deck-editor-modal__error {
+  color: #d32f2f;
+  font-size: 0.8rem;
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.deck-editor-modal__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.deck-editor-modal__btn {
+  width: 100%;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: bold;
+  transition: background 0.15s;
+}
+
+.deck-editor-modal__btn--add {
+  background: #2e7d32;
+  color: #fff;
+}
+
+.deck-editor-modal__btn--add:hover:not(:disabled) {
+  background: #1b5e20;
+}
+
+.deck-editor-modal__btn--add:disabled {
+  background: #b0bec5;
+  cursor: not-allowed;
+}
+
+.deck-editor-modal__btn--remove {
+  background: #d32f2f;
+  color: #fff;
+}
+
+.deck-editor-modal__btn--remove:hover {
+  background: #b71c1c;
+}
+
+.deck-editor-modal__btn--close {
+  background: #78909c;
+  color: #fff;
+}
+
+.deck-editor-modal__btn--close:hover {
+  background: #546e7a;
+}
+
 @media (max-width: 600px) {
   .deck-editor {
     margin-top: 8px;
@@ -200,6 +537,23 @@
   .deck-editor__tab {
     padding: 4px 10px;
     font-size: 0.75rem;
+  }
+
+  .deck-editor__slot-tabs {
+    gap: 3px;
+    margin-bottom: 10px;
+  }
+
+  .deck-editor__slot-tab {
+    padding: 4px 8px;
+  }
+
+  .deck-editor__slot-num {
+    font-size: 0.7rem;
+  }
+
+  .deck-editor__slot-count {
+    font-size: 0.5rem;
   }
 
   .deck-editor__section {
@@ -246,6 +600,38 @@
   .deck-editor__back-btn {
     margin: 12px auto;
     padding: 10px 24px;
+    font-size: 0.9rem;
+  }
+
+  .deck-editor-modal {
+    padding: 16px;
+    max-height: 80vh;
+  }
+
+  .deck-editor-modal__icon {
+    width: 48px;
+    height: 48px;
+  }
+
+  .deck-editor-modal__word {
+    font-size: 1.1rem;
+  }
+
+  .deck-editor-modal__meaning {
+    font-size: 0.8rem;
+  }
+
+  .deck-editor-modal__table {
+    font-size: 0.7rem;
+  }
+
+  .deck-editor-modal__table th,
+  .deck-editor-modal__table td {
+    padding: 4px 6px;
+  }
+
+  .deck-editor-modal__btn {
+    padding: 8px;
     font-size: 0.9rem;
   }
 }

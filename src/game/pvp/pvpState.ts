@@ -10,6 +10,7 @@ import type {
   BattleType,
   Category,
   SpecialCard,
+  PoisonState,
 } from "../types";
 import type { MoveResult } from "../core/applyMove";
 import { cloneBoard, createFreePool } from "../core/helpers";
@@ -41,6 +42,9 @@ function createPlayerState(
     letterLimit: null,
     freePool: createFreePool(),
     spellCheckRemaining: 3,
+    shield: 0,
+    mirrorActive: 0,
+    poison: null,
   };
 }
 
@@ -84,8 +88,32 @@ function nextTurnOwner(current: PvpTurnOwner): PvpTurnOwner {
   return current === "player1" ? "player2" : "player1";
 }
 
+/** 次ターンプレイヤーの毒ティック・シールド/ミラー減衰を適用 */
+function tickStatusEffects(pvp: PvpBattleState, battleType: BattleType): PvpBattleState {
+  const nextKey = pvp.turnOwner === "player1" ? "player2" : "player1";
+  const next = pvp[nextKey];
+  let updated = { ...next };
+
+  // 毒ティック
+  if (updated.poison && updated.poison.turnsLeft > 0) {
+    if (battleType === "hp") {
+      updated.hp = Math.max(0, updated.hp - updated.poison.damage);
+    } else {
+      updated.score = Math.max(0, updated.score - updated.poison.damage);
+    }
+    const remaining = updated.poison.turnsLeft - 1;
+    updated.poison = remaining > 0 ? { damage: updated.poison.damage, turnsLeft: remaining } : null;
+  }
+
+  // シールド・ミラー減衰
+  if (updated.shield > 0) updated.shield--;
+  if (updated.mirrorActive > 0) updated.mirrorActive--;
+
+  return { ...pvp, [nextKey]: updated };
+}
+
 /** 現在ターンのプレイヤー状態を更新した PvpBattleState を返す */
-function updateCurrentPlayer(
+export function updateCurrentPlayer(
   pvp: PvpBattleState,
   updates: Partial<PvpPlayerState>,
 ): PvpBattleState {
@@ -173,6 +201,9 @@ export function applyPvpMove(
     spellCheckRemaining: 3,
   });
 
+  // ターン切替時にステータスエフェクトを処理
+  const tickedPvp = tickStatusEffects(updatedPvp, pvp.battleType);
+
   return {
     newState: {
       ...state,
@@ -183,7 +214,7 @@ export function applyPvpMove(
       lastWords: moveResult.scoreBreakdown.breakdown,
     },
     newPvp: {
-      ...updatedPvp,
+      ...tickedPvp,
       battleTurn: newBattleTurn,
       turnOwner: nextTurnOwner(pvp.turnOwner),
       lastMove: {
@@ -241,6 +272,9 @@ export function applyPvpPass(
     spellCheckRemaining: 3,
   });
 
+  // ターン切替時にステータスエフェクトを処理
+  const tickedPvp2 = tickStatusEffects(updatedPvp, pvp.battleType);
+
   return {
     newState: {
       ...state,
@@ -250,7 +284,7 @@ export function applyPvpPass(
       lastWords: [],
     },
     newPvp: {
-      ...updatedPvp,
+      ...tickedPvp2,
       battleTurn: newBattleTurn,
       turnOwner: nextTurnOwner(pvp.turnOwner),
       lastMove: {

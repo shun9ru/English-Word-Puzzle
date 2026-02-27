@@ -5,13 +5,14 @@
 import { useState, useEffect, useMemo } from "react";
 import type { SpecialCard, Category, DictEntry } from "../game/types";
 import { SPECIAL_CARD_DEFS, emojiToImageUrl } from "../data/specialCardDefs";
-import { loadCollectionFromDB } from "../lib/collectionService";
+import { loadCollectionFromDB, loadCollectionCopiesMap } from "../lib/collectionService";
+import type { CardCopiesInfo } from "../lib/collectionService";
 import { loadUsedWords } from "../lib/scoreService";
 import { loadDictionary } from "../game/dictionary";
 import { rarityColor } from "../game/cards/gacha";
+import { MAX_LEVEL, scaledEffectValue } from "../game/cards/deck";
 import "../styles/Collection.css";
-
-const MAX_LEVEL = 5;
+import "../styles/DeckEditor.css";
 
 type Tab = "cards" | "words";
 
@@ -31,7 +32,9 @@ export function CollectionScreen({ userId, onBack }: CollectionScreenProps) {
   const [tab, setTab] = useState<Tab>("cards");
   const [collection, setCollection] = useState<SpecialCard[]>([]);
   const [usedWords, setUsedWords] = useState<Set<string>>(new Set());
+  const [copiesMap, setCopiesMap] = useState<Map<string, CardCopiesInfo>>(new Map());
   const [loading, setLoading] = useState(true);
+  const [selectedCard, setSelectedCard] = useState<SpecialCard | null>(null);
 
   // カード図鑑用
   useEffect(() => {
@@ -39,9 +42,11 @@ export function CollectionScreen({ userId, onBack }: CollectionScreenProps) {
     Promise.all([
       loadCollectionFromDB(userId),
       loadUsedWords(userId),
-    ]).then(([coll, words]) => {
+      loadCollectionCopiesMap(userId),
+    ]).then(([coll, words, copies]) => {
       setCollection(coll);
       setUsedWords(words);
+      setCopiesMap(copies);
       setLoading(false);
     }).catch(() => setLoading(false));
   }, [userId]);
@@ -74,7 +79,7 @@ export function CollectionScreen({ userId, onBack }: CollectionScreenProps) {
       </div>
 
       {tab === "cards" ? (
-        <CardCollection collection={collection} />
+        <CardCollection collection={collection} onCardClick={setSelectedCard} />
       ) : (
         <WordCollection userId={userId} usedWords={usedWords} />
       )}
@@ -82,13 +87,21 @@ export function CollectionScreen({ userId, onBack }: CollectionScreenProps) {
       <button className="collection__back-btn" onClick={onBack}>
         もどる
       </button>
+
+      {selectedCard && (
+        <CollectionCardModal
+          card={selectedCard}
+          copiesInfo={copiesMap.get(selectedCard.id)}
+          onClose={() => setSelectedCard(null)}
+        />
+      )}
     </div>
   );
 }
 
 /* ===================== カード図鑑 ===================== */
 
-function CardCollection({ collection }: { collection: SpecialCard[] }) {
+function CardCollection({ collection, onCardClick }: { collection: SpecialCard[]; onCardClick: (card: SpecialCard) => void }) {
   const ownedMap = useMemo(() => {
     const map = new Map<string, SpecialCard>();
     for (const c of collection) map.set(c.id, c);
@@ -119,7 +132,7 @@ function CardCollection({ collection }: { collection: SpecialCard[] }) {
         {sorted.map((def) => {
           const owned = ownedMap.get(def.id);
           return owned ? (
-            <OwnedCard key={def.id} card={owned} />
+            <OwnedCard key={def.id} card={owned} onClick={() => onCardClick(owned)} />
           ) : (
             <UnknownCard key={def.id} def={def} />
           );
@@ -129,12 +142,13 @@ function CardCollection({ collection }: { collection: SpecialCard[] }) {
   );
 }
 
-function OwnedCard({ card }: { card: SpecialCard }) {
+function OwnedCard({ card, onClick }: { card: SpecialCard; onClick: () => void }) {
   const isMaxLevel = card.level >= MAX_LEVEL;
   return (
     <div
       className="collection__card collection__card--owned"
-      style={{ borderColor: rarityColor(card.rarity) }}
+      style={{ borderColor: rarityColor(card.rarity), cursor: "pointer" }}
+      onClick={onClick}
     >
       {card.level > 1 && (
         <span className={`collection__card-level${isMaxLevel ? " collection__card-level--max" : ""}`}>
@@ -165,6 +179,112 @@ function UnknownCard({ def }: { def: typeof SPECIAL_CARD_DEFS[number] }) {
       <span className="collection__card-rarity" style={{ color: "#90a4ae" }}>
         {def.rarity}
       </span>
+    </div>
+  );
+}
+
+/* ===================== カード詳細モーダル ===================== */
+
+const CATEGORY_LABELS: Record<string, string> = {
+  animals: "Animals", food: "Food", jobs: "Jobs", hobby: "Hobby", all: "All Genre",
+};
+
+function buildLevelTable(card: SpecialCard): { level: number; desc: string }[] {
+  const rows: { level: number; desc: string }[] = [];
+  for (let lv = 1; lv <= MAX_LEVEL; lv++) {
+    const val = scaledEffectValue(card.effectValue, lv, card.effectType);
+    const rounded = Math.round(val * 10) / 10;
+    let desc = card.description;
+    if (card.effectType === "word_multiplier" || card.effectType === "next_turn_mult") {
+      desc = card.description.replace(/[\d.]+/, String(rounded));
+    } else if (card.effectType !== "force_letter_count" && card.effectType !== "upgrade_bonus") {
+      desc = card.description.replace(/\d+/, String(Math.round(val)));
+    }
+    rows.push({ level: lv, desc });
+  }
+  return rows;
+}
+
+function CollectionCardModal({ card, copiesInfo, onClose }: {
+  card: SpecialCard;
+  copiesInfo: CardCopiesInfo | undefined;
+  onClose: () => void;
+}) {
+  const levelTable = buildLevelTable(card);
+  const isMax = card.level >= MAX_LEVEL;
+
+  return (
+    <div className="deck-editor-modal-overlay" onClick={onClose}>
+      <div className="deck-editor-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="deck-editor-modal__header">
+          <img className="deck-editor-modal__icon" src={emojiToImageUrl(card.icon)} alt={card.word} />
+          <div className="deck-editor-modal__header-info">
+            <span className="deck-editor-modal__word">{card.word}</span>
+            <span className="deck-editor-modal__meaning">{card.meaning}</span>
+            <span className="deck-editor-modal__rarity" style={{ color: rarityColor(card.rarity) }}>
+              {card.rarity}
+            </span>
+            {card.battleOnly && <span className="deck-editor-modal__battle-tag">バトル専用</span>}
+          </div>
+        </div>
+
+        <div className="deck-editor-modal__categories">
+          {card.categories.map((cat) => (
+            <span key={cat} className="deck-editor-modal__cat-pill">{CATEGORY_LABELS[cat] ?? cat}</span>
+          ))}
+        </div>
+
+        <div className="deck-editor-modal__level-section">
+          <span className="deck-editor-modal__level-label">
+            Lv.{card.level}{isMax ? " (MAX)" : ""}
+          </span>
+          {copiesInfo && !isMax ? (
+            <div className="deck-editor-modal__copies">
+              <div className="deck-editor-modal__copies-bar">
+                <div
+                  className="deck-editor-modal__copies-fill"
+                  style={{ width: `${Math.min(100, (copiesInfo.copies / copiesInfo.copiesNeeded) * 100)}%` }}
+                />
+              </div>
+              <span className="deck-editor-modal__copies-text">
+                {copiesInfo.copies}/{copiesInfo.copiesNeeded} コピー
+              </span>
+            </div>
+          ) : isMax ? (
+            <span className="deck-editor-modal__copies-max">MAX</span>
+          ) : null}
+        </div>
+
+        <div className="deck-editor-modal__effect">
+          <span className="deck-editor-modal__effect-label">現在の効果:</span>
+          <span className="deck-editor__card-desc">{card.description}</span>
+        </div>
+
+        <div className="deck-editor-modal__table-wrap">
+          <table className="deck-editor-modal__table">
+            <thead>
+              <tr><th>Lv.</th><th>効果</th></tr>
+            </thead>
+            <tbody>
+              {levelTable.map((row) => (
+                <tr
+                  key={row.level}
+                  className={row.level === card.level ? "deck-editor-modal__table-row--current" : ""}
+                >
+                  <td>Lv.{row.level}</td>
+                  <td>{row.desc}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="deck-editor-modal__actions">
+          <button className="deck-editor-modal__btn deck-editor-modal__btn--close" onClick={onClose}>
+            閉じる
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

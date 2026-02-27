@@ -35,6 +35,7 @@ interface SpecialCardSlotsProps {
   onUnsetCard: () => void;
   lastSpecialCategory: Category | null;
   disabled?: boolean;
+  deckRemaining?: number;
 }
 
 export function SpecialCardSlots({
@@ -44,6 +45,7 @@ export function SpecialCardSlots({
   onUnsetCard,
   lastSpecialCategory,
   disabled,
+  deckRemaining,
 }: SpecialCardSlotsProps) {
   return (
     <div className="special-cards">
@@ -88,7 +90,7 @@ export function SpecialCardSlots({
       </div>
 
       <div className="special-cards__hand">
-        <div className="special-cards__hand-label">手持ち ({hand.length}/4)</div>
+        <div className="special-cards__hand-label">手持ち ({hand.length}/4){deckRemaining != null && <span className="special-cards__remaining"> 山札: {deckRemaining}</span>}</div>
         <div className="special-cards__hand-list">
           {hand.map((card) => {
             const isBlocked = lastSpecialCategory !== null

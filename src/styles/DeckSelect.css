@@ -1,0 +1,135 @@
+/* ========================================
+   デッキ選択画面
+   ======================================== */
+
+.deck-select {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  padding: 32px 20px;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.deck-select__title {
+  font-size: 1.6rem;
+  color: #1b5e20;
+}
+
+.deck-select__sub {
+  font-size: 0.9rem;
+  color: #546e7a;
+}
+
+.deck-select__player {
+  width: 100%;
+  text-align: center;
+}
+
+.deck-select__player-label {
+  font-size: 1rem;
+  color: #37474f;
+  margin-bottom: 8px;
+}
+
+.deck-select__slots {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.deck-select__slot {
+  width: 80px;
+  height: 64px;
+  border: 2px solid #b0bec5;
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  transition: all 0.15s;
+}
+
+.deck-select__slot:hover {
+  border-color: #1565c0;
+  background: #e3f2fd;
+}
+
+.deck-select__slot--active {
+  border-color: #1565c0;
+  background: #bbdefb;
+  box-shadow: 0 2px 8px rgba(21, 101, 192, 0.3);
+}
+
+.deck-select__slot--empty {
+  opacity: 0.5;
+}
+
+.deck-select__slot--empty.deck-select__slot--active {
+  opacity: 0.8;
+}
+
+.deck-select__slot-name {
+  font-size: 0.85rem;
+  font-weight: bold;
+  color: #1a237e;
+}
+
+.deck-select__slot-count {
+  font-size: 0.7rem;
+  color: #78909c;
+}
+
+.deck-select__waiting {
+  font-size: 1rem;
+  color: #78909c;
+  animation: deck-select-pulse 1.5s ease-in-out infinite;
+}
+
+.deck-select__error {
+  color: #d32f2f;
+  font-size: 0.85rem;
+  text-align: center;
+  background: #ffebee;
+  padding: 8px 16px;
+  border-radius: 8px;
+  width: 100%;
+}
+
+@keyframes deck-select-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+@media (max-width: 600px) {
+  .deck-select {
+    padding: 20px 12px;
+    gap: 16px;
+  }
+
+  .deck-select__title {
+    font-size: 1.3rem;
+  }
+
+  .deck-select__slots {
+    gap: 6px;
+  }
+
+  .deck-select__slot {
+    width: 60px;
+    height: 52px;
+  }
+
+  .deck-select__slot-name {
+    font-size: 0.75rem;
+  }
+
+  .deck-select__slot-count {
+    font-size: 0.6rem;
+  }
+}

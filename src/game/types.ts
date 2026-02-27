@@ -60,15 +60,27 @@ export type Rarity = "N" | "R" | "SR" | "SSR";
 
 /** スペシャルカード効果タイプ */
 export type SpecialEffectType =
-  | "bonus_flat"       // 固定加点
-  | "word_multiplier"  // 単語スコア倍率
-  | "draw_normal"      // ノーマルカード追加ドロー
-  | "recover_free"     // フリーカード回復
-  | "upgrade_bonus"    // ボーナスマスアップグレード
-  | "next_turn_mult"      // 次ターンスコア倍率
-  | "reduce_opponent"     // 相手スコア減少（バトル専用）
+  | "bonus_flat"         // 固定加点
+  | "word_multiplier"    // 単語スコア倍率
+  | "draw_normal"        // ノーマルカード追加ドロー
+  | "recover_free"       // フリーカード回復
+  | "upgrade_bonus"      // ボーナスマスアップグレード
+  | "next_turn_mult"     // 次ターンスコア倍率
+  | "reduce_opponent"    // 相手スコア減少（バトル専用）
   | "force_letter_count" // 相手の次ターン使用タイル数制限（バトル専用）
-  | "heal_hp";           // HP回復（HPバトル専用）
+  | "heal_hp"            // HP回復（HPバトル専用）
+  | "bonus_per_letter"   // 置いた文字数×N点
+  | "draw_special"       // スペシャルカード追加ドロー
+  | "steal_points"       // 相手スコア奪取（バトル専用）
+  | "shield"             // 妨害無効化（バトル専用）
+  | "poison"             // 継続ダメージ（バトル専用）
+  | "mirror";            // 相手効果コピー（バトル専用）
+
+/** 毒状態 */
+export interface PoisonState {
+  damage: number;
+  turnsLeft: number;
+}
 
 /** スペシャルカード定義 */
 export interface SpecialCardDef {
@@ -183,6 +195,18 @@ export interface BattleState {
   cpuHp: number;
   /** HP バトル用: 最大HP（初期値、表示用） */
   maxHp: number;
+  /** シールド: プレイヤー残ターン */
+  playerShield: number;
+  /** シールド: CPU残ターン */
+  cpuShield: number;
+  /** ミラー: プレイヤー残ターン */
+  playerMirror: number;
+  /** ミラー: CPU残ターン */
+  cpuMirror: number;
+  /** 毒: プレイヤーへの毒 */
+  playerPoison: PoisonState | null;
+  /** 毒: CPUへの毒 */
+  cpuPoison: PoisonState | null;
 }
 
 /** PvP ターン所有者 */
@@ -204,6 +228,9 @@ export interface PvpPlayerState {
   letterLimit: number | null;
   freePool: Record<string, number>;
   spellCheckRemaining: number;
+  shield: number;
+  mirrorActive: number;
+  poison: PoisonState | null;
 }
 
 /** PvP 対戦モード用の状態 */
@@ -251,6 +278,8 @@ export interface BattleRoom {
   game_config: RoomConfig;
   game_state: GameState | null;
   pvp_battle_state: PvpBattleState | null;
+  host_deck_slot: number;
+  guest_deck_slot: number | null;
   created_at: string;
 }
 

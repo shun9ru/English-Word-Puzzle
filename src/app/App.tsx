@@ -7,8 +7,8 @@ import type { GameState, GameMode, BattleType, CpuDifficulty, Category, Placemen
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { findBestMove } from "../game/cpu/cpuAI";
 import { applyCpuMove, applyCpuPass } from "../game/cpu/applyCpuMove";
-import { initPvpBattleState, applyPvpMove, applyPvpPass, getCurrentPlayer, getOpponentPlayer, updateOpponentPlayer, swapRackForTurn } from "../game/pvp/pvpState";
-import { updateRoomGameState, finishRoom, subscribeToRoom, unsubscribeFromRoom } from "../lib/roomService";
+import { initPvpBattleState, applyPvpMove, applyPvpPass, getCurrentPlayer, getOpponentPlayer, updateOpponentPlayer, updateCurrentPlayer, swapRackForTurn } from "../game/pvp/pvpState";
+import { updateRoomGameState, finishRoom, subscribeToRoom, unsubscribeFromRoom, updateRoomConfig } from "../lib/roomService";
 import { loadDictionary } from "../game/dictionary";
 import { loadBoardLayout } from "../game/boardLayout";
 import { createEmptyBoard, cloneBoard, createFreePool } from "../game/core/helpers";
@@ -38,6 +38,7 @@ import { CollectionScreen } from "../components/CollectionScreen";
 import { TurnHistory } from "../components/TurnHistory";
 import { PvpLobby } from "../components/PvpLobby";
 import { OnlineLobby } from "../components/OnlineLobby";
+import { DeckSelectScreen } from "../components/DeckSelectScreen";
 import "../styles/App.css";
 
 const CATEGORY_LABELS: Record<Category, string> = {
@@ -65,7 +66,7 @@ const TURN_OPTIONS = [
   { turns: 15, label: "15ターン", desc: "ロング" },
 ] as const;
 
-type Screen = "login" | "title" | "categorySelect" | "game" | "result" | "tutorial" | "gacha" | "deckEdit" | "collection" | "admin" | "pvpLobby" | "onlineLobby" | "ranking";
+type Screen = "login" | "title" | "categorySelect" | "deckSelect" | "game" | "result" | "tutorial" | "gacha" | "deckEdit" | "collection" | "admin" | "pvpLobby" | "onlineLobby" | "ranking";
 
 export default function App() {
   // 認証
@@ -115,6 +116,9 @@ export default function App() {
   const [showTurnInterstitial, setShowTurnInterstitial] = useState(false);
   const [onlineChannel, setOnlineChannel] = useState<RealtimeChannel | null>(null);
   const [onlineRoomId, setOnlineRoomId] = useState<string | null>(null);
+
+  // デッキ選択
+  const [p2UserId, setP2UserId] = useState<string | null>(null);
 
   // タイマー
   const [timeRemaining, setTimeRemaining] = useState(TURN_TIME);
@@ -223,7 +227,7 @@ export default function App() {
   }, [stopTimer, onlineChannel]);
 
   // ゲーム開始
-  const startGame = useCallback(async () => {
+  const startGame = useCallback(async (p1Slot: number = 0, p2Slot?: number) => {
     if (!userId) return;
     setLoading(true);
     setMessage("");
@@ -251,7 +255,7 @@ export default function App() {
       }
 
       // スペシャルカード読み込み（ソロモードではバトル専用カードを除外）
-      const playerDeck = await loadDeckFromDB(userId, selectedCategory);
+      const playerDeck = await loadDeckFromDB(userId, selectedCategory, p1Slot);
       const allDeck = prepareGameDeck(playerDeck);
       const gameDeck = (isBattle || isPvp) ? allDeck : allDeck.filter((c) => !c.battleOnly);
       const initialSpecialHand = gameDeck.slice(0, Math.min(4, gameDeck.length));
@@ -287,9 +291,18 @@ export default function App() {
       setSpellHistory([]);
 
       if (isPvp) {
-        // PvP: player2用にもデッキを準備（PoC: 同一デッキのコピー）
-        const p2Deck = prepareGameDeck(playerDeck);
-        const p2GameDeck = p2Deck; // battleOnly含む
+        // PvP: Player2 のデッキを個別にロード
+        let p2GameDeck: SpecialCard[];
+        if (gameMode === "local_pvp" && p2UserId) {
+          const p2DeckRaw = await loadDeckFromDB(p2UserId, selectedCategory, p2Slot ?? 0);
+          p2GameDeck = prepareGameDeck(p2DeckRaw);
+        } else if (gameMode === "online_pvp" && pvpPlayer2Name && pvpPlayer2Name !== userId) {
+          const p2DeckRaw = await loadDeckFromDB(pvpPlayer2Name, selectedCategory, p2Slot ?? 0);
+          p2GameDeck = prepareGameDeck(p2DeckRaw);
+        } else {
+          // フォールバック: P1デッキをコピー
+          p2GameDeck = prepareGameDeck(playerDeck);
+        }
 
         const pvp = initPvpBattleState(
           gameMode as "local_pvp" | "online_pvp",
@@ -357,6 +370,12 @@ export default function App() {
           playerHp: DEFAULT_MAX_HP,
           cpuHp: DEFAULT_MAX_HP,
           maxHp: DEFAULT_MAX_HP,
+          playerShield: 0,
+          cpuShield: 0,
+          playerMirror: 0,
+          cpuMirror: 0,
+          playerPoison: null,
+          cpuPoison: null,
         });
         setPvpBattleState(null);
       } else {
@@ -371,7 +390,7 @@ export default function App() {
     } finally {
       setLoading(false);
     }
-  }, [userId, selectedCategory, selectedBoardSize, selectedMaxTurns, gameMode, battleType, startTimer, pvpPlayer1Name, pvpPlayer2Name, onlineRoomId, onlineChannel]);
+  }, [userId, selectedCategory, selectedBoardSize, selectedMaxTurns, gameMode, battleType, startTimer, pvpPlayer1Name, pvpPlayer2Name, onlineRoomId, onlineChannel, p2UserId]);
 
   // ラック選択
   const selectRackTile = useCallback((index: number) => {
@@ -547,6 +566,12 @@ export default function App() {
         case "reduce_opponent":
         case "force_letter_count":
         case "heal_hp":
+        case "bonus_per_letter":
+        case "draw_special":
+        case "steal_points":
+        case "shield":
+        case "poison":
+        case "mirror":
           break;
       }
 
@@ -579,6 +604,20 @@ export default function App() {
       setMessage("CPU が考え中...");
 
       cpuTimerRef.current = setTimeout(() => {
+        // CPUターン開始: 毒ティック
+        if (battle.cpuPoison && battle.cpuPoison.turnsLeft > 0) {
+          if (battle.battleType === "hp") {
+            battle = { ...battle, cpuHp: Math.max(0, battle.cpuHp - battle.cpuPoison.damage) };
+          } else {
+            battle = { ...battle, cpuScore: Math.max(0, battle.cpuScore - battle.cpuPoison.damage) };
+          }
+          const remaining = battle.cpuPoison.turnsLeft - 1;
+          battle = { ...battle, cpuPoison: remaining > 0 ? { ...battle.cpuPoison, turnsLeft: remaining } : null };
+        }
+        // CPUターン開始: シールド・ミラー減衰
+        if (battle.cpuShield > 0) battle = { ...battle, cpuShield: battle.cpuShield - 1 };
+        if (battle.cpuMirror > 0) battle = { ...battle, cpuMirror: battle.cpuMirror - 1 };
+
         const bestMove = findBestMove(state.board, battle.cpuRack, dict, state.layout, battle.cpuLetterLimit, cpuDifficulty);
 
         let result: { newState: GameState; newBattle: BattleState };
@@ -643,6 +682,19 @@ export default function App() {
         setCpuThinking(false);
         cpuTimerRef.current = null;
 
+        // プレイヤーターン開始: 毒ティック
+        if (result.newBattle.playerPoison && result.newBattle.playerPoison.turnsLeft > 0) {
+          if (result.newBattle.battleType === "hp") {
+            result.newBattle = { ...result.newBattle, playerHp: Math.max(0, result.newBattle.playerHp - result.newBattle.playerPoison.damage) };
+          }
+          // スコアバトルでのプレイヤー毒は playerScore に影響（GameState.score で管理）
+          const pRemaining = result.newBattle.playerPoison.turnsLeft - 1;
+          result.newBattle = { ...result.newBattle, playerPoison: pRemaining > 0 ? { ...result.newBattle.playerPoison, turnsLeft: pRemaining } : null };
+        }
+        // プレイヤーターン開始: シールド・ミラー減衰
+        if (result.newBattle.playerShield > 0) result.newBattle = { ...result.newBattle, playerShield: result.newBattle.playerShield - 1 };
+        if (result.newBattle.playerMirror > 0) result.newBattle = { ...result.newBattle, playerMirror: result.newBattle.playerMirror - 1 };
+
         if (result.newState.finished) {
           stopTimer();
           saveGameResult(result.newState);
@@ -682,7 +734,7 @@ export default function App() {
 
       if (special.activated && gameState.specialSet) {
         const card = gameState.specialSet;
-        const ev = scaledEffectValue(card.effectValue, card.level ?? 1);
+        const ev = scaledEffectValue(card.effectValue, card.level ?? 1, card.effectType);
         let totalScore = scoreBreakdown.total;
 
         switch (card.effectType) {
@@ -715,12 +767,71 @@ export default function App() {
           case "next_turn_mult":
             pvpGameState = { ...pvpGameState, nextTurnMultiplier: ev };
             break;
-          case "reduce_opponent":
-            pvp = updateOpponentPlayer(pvp, { score: Math.max(0, opponentPlayer.score - Math.round(ev)) });
+          case "reduce_opponent": {
+            const opponent = getOpponentPlayer(pvp);
+            if (opponent.shield > 0) {
+              pvp = updateOpponentPlayer(pvp, { shield: opponent.shield - 1 });
+            } else {
+              pvp = updateOpponentPlayer(pvp, { score: Math.max(0, opponent.score - Math.round(ev)) });
+            }
             break;
-          case "force_letter_count":
-            pvp = updateOpponentPlayer(pvp, { letterLimit: Math.round(ev) });
+          }
+          case "force_letter_count": {
+            const opponent2 = getOpponentPlayer(pvp);
+            if (opponent2.shield > 0) {
+              pvp = updateOpponentPlayer(pvp, { shield: opponent2.shield - 1 });
+            } else {
+              pvp = updateOpponentPlayer(pvp, { letterLimit: Math.round(ev) });
+            }
             break;
+          }
+          case "bonus_per_letter": {
+            const perLetter = Math.round(ev);
+            totalScore += perLetter * gameState.placedThisTurn.length;
+            break;
+          }
+          case "draw_special": {
+            const drawCount = Math.round(ev);
+            let hand = [...pvpGameState.specialHand];
+            let deck = [...pvpGameState.specialDeck];
+            for (let i = 0; i < drawCount && deck.length > 0; i++) {
+              hand.push(deck[0]); deck = deck.slice(1);
+            }
+            pvpGameState = { ...pvpGameState, specialHand: hand, specialDeck: deck };
+            break;
+          }
+          case "steal_points": {
+            const opponent3 = getOpponentPlayer(pvp);
+            if (opponent3.shield > 0) {
+              pvp = updateOpponentPlayer(pvp, { shield: opponent3.shield - 1 });
+            } else {
+              const stealAmount = Math.min(Math.round(ev), opponent3.score);
+              pvp = updateOpponentPlayer(pvp, { score: opponent3.score - stealAmount });
+              totalScore += stealAmount;
+            }
+            break;
+          }
+          case "shield": {
+            const duration = Math.round(ev);
+            pvp = updateCurrentPlayer(pvp, { shield: duration });
+            break;
+          }
+          case "poison": {
+            const opponent4 = getOpponentPlayer(pvp);
+            if (opponent4.shield > 0) {
+              pvp = updateOpponentPlayer(pvp, { shield: opponent4.shield - 1 });
+            } else {
+              const dmg = Math.round(ev);
+              const turnsLeft = 3 + Math.floor(((card.level ?? 1) - 1) / 2);
+              pvp = updateOpponentPlayer(pvp, { poison: { damage: dmg, turnsLeft } });
+            }
+            break;
+          }
+          case "mirror": {
+            const mirrorDuration = Math.round(ev);
+            pvp = updateCurrentPlayer(pvp, { mirrorActive: mirrorDuration });
+            break;
+          }
           case "heal_hp":
             break;
           case "upgrade_bonus":
@@ -743,7 +854,7 @@ export default function App() {
         updatedOpponentHp = Math.max(0, updatedOpponentHp - scoreBreakdown.total);
         if (special.activated && gameState.specialSet?.effectType === "heal_hp") {
           const card = gameState.specialSet;
-          const healAmount = Math.round(scaledEffectValue(card.effectValue, card.level ?? 1));
+          const healAmount = Math.round(scaledEffectValue(card.effectValue, card.level ?? 1, card.effectType));
           updatedPlayerHp = Math.min(pvpBattleState.maxHp, updatedPlayerHp + healAmount);
         }
       }
@@ -769,7 +880,7 @@ export default function App() {
       // 履歴記録
       let healAmount = 0;
       if (pvpBattleState.battleType === "hp" && special.activated && gameState.specialSet?.effectType === "heal_hp") {
-        healAmount = Math.round(scaledEffectValue(gameState.specialSet.effectValue, gameState.specialSet.level ?? 1));
+        healAmount = Math.round(scaledEffectValue(gameState.specialSet.effectValue, gameState.specialSet.level ?? 1, gameState.specialSet.effectType));
       }
       const pvpHistoryEntry: TurnHistoryEntry = {
         turn: Math.floor(finalPvp.battleTurn / 2) + 1,
@@ -837,10 +948,15 @@ export default function App() {
       let specialMsg = "";
       let newCpuLetterLimit: number | null = battleState.cpuLetterLimit;
       let newCpuScore = battleState.cpuScore;
+      let newPlayerShield = battleState.playerShield;
+      let newCpuShield = battleState.cpuShield;
+      let newPlayerMirror = battleState.playerMirror;
+      let newCpuPoison = battleState.cpuPoison;
+      let newPlayerPoison = battleState.playerPoison;
 
       if (special.activated && battleGameState.specialSet) {
         const card = battleGameState.specialSet;
-        const ev = scaledEffectValue(card.effectValue, card.level ?? 1);
+        const ev = scaledEffectValue(card.effectValue, card.level ?? 1, card.effectType);
         let totalScore = scoreBreakdown.total;
 
         switch (card.effectType) {
@@ -881,10 +997,51 @@ export default function App() {
             battleGameState = { ...battleGameState, nextTurnMultiplier: ev };
             break;
           case "reduce_opponent":
-            newCpuScore = Math.max(0, newCpuScore - Math.round(ev));
+            if (newCpuShield > 0) { newCpuShield--; }
+            else { newCpuScore = Math.max(0, newCpuScore - Math.round(ev)); }
             break;
           case "force_letter_count":
-            newCpuLetterLimit = Math.round(ev);
+            if (newCpuShield > 0) { newCpuShield--; }
+            else { newCpuLetterLimit = Math.round(ev); }
+            break;
+          case "bonus_per_letter": {
+            const perLetter = Math.round(ev);
+            totalScore += perLetter * gameState.placedThisTurn.length;
+            break;
+          }
+          case "draw_special": {
+            const spDrawCount = Math.round(ev);
+            let hand = [...battleGameState.specialHand];
+            let deck = [...battleGameState.specialDeck];
+            for (let i = 0; i < spDrawCount && deck.length > 0; i++) {
+              hand.push(deck[0]); deck = deck.slice(1);
+            }
+            battleGameState = { ...battleGameState, specialHand: hand, specialDeck: deck };
+            break;
+          }
+          case "steal_points": {
+            if (newCpuShield > 0) { newCpuShield--; }
+            else {
+              const stealAmount = Math.min(Math.round(ev), newCpuScore);
+              newCpuScore -= stealAmount;
+              totalScore += stealAmount;
+            }
+            break;
+          }
+          case "shield":
+            newPlayerShield = Math.round(ev);
+            break;
+          case "poison": {
+            if (newCpuShield > 0) { newCpuShield--; }
+            else {
+              const dmg = Math.round(ev);
+              const turnsLeft = 3 + Math.floor(((card.level ?? 1) - 1) / 2);
+              newCpuPoison = { damage: dmg, turnsLeft };
+            }
+            break;
+          }
+          case "mirror":
+            newPlayerMirror = Math.round(ev);
             break;
           case "heal_hp":
             // HP回復はスコア計算後に別途処理
@@ -914,7 +1071,7 @@ export default function App() {
         // heal_hp カード効果
         if (special.activated && battleGameState.specialSet?.effectType === "heal_hp") {
           const card = battleGameState.specialSet;
-          const healAmount = Math.round(scaledEffectValue(card.effectValue, card.level ?? 1));
+          const healAmount = Math.round(scaledEffectValue(card.effectValue, card.level ?? 1, card.effectType));
           newPlayerHp = Math.min(battleState.maxHp, newPlayerHp + healAmount);
         }
       }
@@ -934,7 +1091,7 @@ export default function App() {
       // プレイヤーターン履歴記録
       let healAmount = 0;
       if (battleState.battleType === "hp" && special.activated && gameState.specialSet?.effectType === "heal_hp") {
-        healAmount = Math.round(scaledEffectValue(gameState.specialSet.effectValue, gameState.specialSet.level ?? 1));
+        healAmount = Math.round(scaledEffectValue(gameState.specialSet.effectValue, gameState.specialSet.level ?? 1, gameState.specialSet.effectType));
       }
       const playerHistoryEntry: TurnHistoryEntry = {
         turn: Math.floor(newBattleTurn / 2) + 1,
@@ -962,6 +1119,12 @@ export default function App() {
         cpuLetterLimit: newCpuLetterLimit,
         playerHp: newPlayerHp,
         cpuHp: newCpuHp,
+        playerShield: newPlayerShield,
+        cpuShield: newCpuShield,
+        playerMirror: newPlayerMirror,
+        cpuMirror: battleState.cpuMirror,
+        playerPoison: newPlayerPoison,
+        cpuPoison: newCpuPoison,
       };
 
       setGameState(finalState);
@@ -995,7 +1158,7 @@ export default function App() {
 
     if (special.activated && gameState.specialSet) {
       const card = gameState.specialSet;
-      const ev = scaledEffectValue(card.effectValue, card.level ?? 1);
+      const ev = scaledEffectValue(card.effectValue, card.level ?? 1, card.effectType);
       let totalScore = scoreBreakdown.total;
 
       switch (card.effectType) {
@@ -1035,7 +1198,29 @@ export default function App() {
         case "next_turn_mult":
           newState = { ...newState, nextTurnMultiplier: ev };
           break;
+        case "bonus_per_letter": {
+          const perLetter = Math.round(ev);
+          totalScore += perLetter * gameState.placedThisTurn.length;
+          break;
+        }
+        case "draw_special": {
+          const spDrawCount = Math.round(ev);
+          let hand = [...newState.specialHand];
+          let deck = [...newState.specialDeck];
+          for (let i = 0; i < spDrawCount && deck.length > 0; i++) {
+            hand.push(deck[0]); deck = deck.slice(1);
+          }
+          newState = { ...newState, specialHand: hand, specialDeck: deck };
+          break;
+        }
         case "upgrade_bonus":
+        case "reduce_opponent":
+        case "force_letter_count":
+        case "heal_hp":
+        case "steal_points":
+        case "shield":
+        case "poison":
+        case "mirror":
           break;
       }
 
@@ -1319,14 +1504,86 @@ export default function App() {
     );
   }
 
+  // デッキ選択画面
+  if (screen === "deckSelect") {
+    const isOnlineGuest = gameMode === "online_pvp" && onlineRoomId && pvpPlayer1Name !== userId;
+    const isOnlineHost = gameMode === "online_pvp" && onlineRoomId && pvpPlayer1Name === userId;
+
+    return (
+      <div className="app app--categorySelect">
+        <DeckSelectScreen
+          mode={gameMode}
+          category={selectedCategory}
+          player1UserId={isOnlineGuest ? userId! : userId!}
+          player1Name={isOnlineGuest ? userId! : pvpPlayer1Name}
+          player2UserId={gameMode === "local_pvp" ? (p2UserId ?? undefined) : undefined}
+          player2Name={gameMode === "local_pvp" ? pvpPlayer2Name : undefined}
+          roomId={gameMode === "online_pvp" ? (onlineRoomId ?? undefined) : undefined}
+          isHost={isOnlineHost ?? false}
+          starting={loading}
+          errorMessage={message}
+          onConfirm={(p1Slot, p2Slot) => {
+            if (isOnlineGuest) {
+              // ゲスト: スロット確定後、game_state の到着を待つ
+              let gameStarted = false;
+              const channel = subscribeToRoom(onlineRoomId!, (updatedRoom) => {
+                if (!updatedRoom.game_state || !updatedRoom.pvp_battle_state) return;
+                const gs = updatedRoom.game_state;
+                const remotePvp = updatedRoom.pvp_battle_state;
+
+                if (!gameStarted) {
+                  gameStarted = true;
+                  const myPvp = { ...remotePvp, myRole: "player2" as const };
+                  setPvpBattleState(myPvp);
+                  Promise.all([
+                    loadDictionary(gs.category),
+                    loadBoardLayout(gs.layout.size),
+                  ]).then(([dictionary]) => {
+                    setDict(dictionary.set);
+                    setDictEntries(dictionary.entries);
+                  });
+                  setGameState({ ...gs, rack: remotePvp.player2.rack });
+                  setScreen("game");
+                } else {
+                  if (gs.finished) {
+                    setGameState(gs);
+                    setPvpBattleState({ ...remotePvp, myRole: "player2" });
+                    stopTimer();
+                    setScreen("result");
+                  } else if (remotePvp.turnOwner === "player2") {
+                    const swapped = swapRackForTurn(gs, remotePvp);
+                    setGameState(swapped);
+                    setPvpBattleState({ ...remotePvp, myRole: "player2" });
+                    startTimer();
+                  } else {
+                    setGameState(gs);
+                    setPvpBattleState({ ...remotePvp, myRole: "player2" });
+                  }
+                }
+              });
+              setOnlineChannel(channel);
+            } else {
+              // ホスト / ソロ / CPU / ローカルPvP: ゲーム開始
+              startGame(p1Slot, p2Slot);
+            }
+          }}
+          onBack={() => setScreen("categorySelect")}
+        />
+      </div>
+    );
+  }
+
   // ローカルPvPロビー
   if (screen === "pvpLobby") {
     return (
       <div className="app app--categorySelect">
         <PvpLobby
-          onStart={(p1, p2) => {
-            setPvpPlayer1Name(p1);
-            setPvpPlayer2Name(p2);
+          player1UserId={userId!}
+          player1Name={userId!}
+          onStart={(p1Name, p2Name, p2Id) => {
+            setPvpPlayer1Name(p1Name);
+            setPvpPlayer2Name(p2Name);
+            setP2UserId(p2Id);
             setScreen("categorySelect");
           }}
           onBack={returnToTitle}
@@ -1363,51 +1620,14 @@ export default function App() {
             setOnlineRoomId(room.id);
             setPvpPlayer1Name(room.host_user_id);
             setPvpPlayer2Name(userId!);
-            let gameStarted = false;
-            // Guest: subscribe for host's game start and ongoing updates
-            const channel = subscribeToRoom(room.id, (updatedRoom) => {
-              if (!updatedRoom.game_state || !updatedRoom.pvp_battle_state) return;
-              const gs = updatedRoom.game_state;
-              const remotePvp = updatedRoom.pvp_battle_state;
-
-              if (!gameStarted) {
-                // 初回: ゲーム開始
-                gameStarted = true;
-                const myPvp = { ...remotePvp, myRole: "player2" as const };
-                setPvpBattleState(myPvp);
-                // dict をロード
-                Promise.all([
-                  loadDictionary(gs.category),
-                  loadBoardLayout(gs.layout.size),
-                ]).then(([dictionary]) => {
-                  setDict(dictionary.set);
-                  setDictEntries(dictionary.entries);
-                });
-                // Player2のrackで表示
-                setGameState({ ...gs, rack: remotePvp.player2.rack });
-                setScreen("game");
-                // Player1が先手なので、Player2はまだタイマー不要
-              } else {
-                // 以降: ゲーム中の状態更新
-                if (gs.finished) {
-                  setGameState(gs);
-                  setPvpBattleState({ ...remotePvp, myRole: "player2" });
-                  stopTimer();
-                  setScreen("result");
-                } else if (remotePvp.turnOwner === "player2") {
-                  // 自分のターンになった
-                  const swapped = swapRackForTurn(gs, remotePvp);
-                  setGameState(swapped);
-                  setPvpBattleState({ ...remotePvp, myRole: "player2" });
-                  startTimer();
-                } else {
-                  // 相手のターン → 盤面だけ更新（自分の手の結果を反映）
-                  setGameState(gs);
-                  setPvpBattleState({ ...remotePvp, myRole: "player2" });
-                }
-              }
-            });
-            setOnlineChannel(channel);
+            // ルームの設定からカテゴリ等を読み取り
+            setSelectedCategory(room.game_config.category);
+            setSelectedBoardSize(room.game_config.boardSize);
+            setSelectedMaxTurns(room.game_config.maxTurns);
+            setBattleType(room.game_config.battleType);
+            setGameMode("online_pvp");
+            // デッキ選択画面へ（ゲスト用）
+            setScreen("deckSelect");
           }}
           onBack={returnToTitle}
         />
@@ -1487,10 +1707,21 @@ export default function App() {
 
           <button
             className="start-btn"
-            onClick={startGame}
+            onClick={async () => {
+              // オンラインPvP: カテゴリ確定時にルーム設定を更新
+              if (gameMode === "online_pvp" && onlineRoomId) {
+                await updateRoomConfig(onlineRoomId, {
+                  category: selectedCategory,
+                  boardSize: selectedBoardSize,
+                  maxTurns: selectedMaxTurns,
+                  battleType,
+                });
+              }
+              setScreen("deckSelect");
+            }}
             disabled={loading}
           >
-            {loading ? "読み込み中..." : "スタート"}
+            つぎへ
           </button>
 
           <button
@@ -1871,6 +2102,8 @@ export default function App() {
           playerHp={battleState?.playerHp}
           cpuHp={battleState?.cpuHp}
           maxHp={battleState?.maxHp ?? pvpBattleState?.maxHp}
+          playerStatus={battleState ? { shield: battleState.playerShield, poison: battleState.playerPoison, mirror: battleState.playerMirror } : undefined}
+          cpuStatus={battleState ? { shield: battleState.cpuShield, poison: battleState.cpuPoison, mirror: battleState.cpuMirror } : undefined}
           pvpMode={pvpBattleState !== null}
           pvpTurnOwner={pvpBattleState?.turnOwner}
           player1Name={pvpBattleState?.player1.name}
@@ -1879,6 +2112,8 @@ export default function App() {
           player2Score={pvpBattleState?.player2.score}
           player1Hp={pvpBattleState?.player1.hp}
           player2Hp={pvpBattleState?.player2.hp}
+          player1Status={pvpBattleState ? { shield: pvpBattleState.player1.shield, poison: pvpBattleState.player1.poison, mirror: pvpBattleState.player1.mirrorActive } : undefined}
+          player2Status={pvpBattleState ? { shield: pvpBattleState.player2.shield, poison: pvpBattleState.player2.poison, mirror: pvpBattleState.player2.mirrorActive } : undefined}
           isMyTurn={pvpBattleState?.mode === "online_pvp" ? !isOnlineOpponentTurn : undefined}
         />
 
@@ -1919,6 +2154,7 @@ export default function App() {
           )}
           onSelect={selectRackTile}
           disabled={allDisabled}
+          bagCount={gameState.bag.length}
         />
 
         <FreeCardPanel
@@ -1936,6 +2172,7 @@ export default function App() {
             onUnsetCard={handleUnsetSpecial}
             lastSpecialCategory={gameState.lastSpecialCategory}
             disabled={allDisabled}
+            deckRemaining={gameState.specialDeck.length}
           />
         )}
 

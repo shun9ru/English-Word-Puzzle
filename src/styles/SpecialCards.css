@@ -23,6 +23,13 @@
   font-weight: bold;
 }
 
+.special-cards__remaining {
+  font-weight: normal;
+  color: #78909c;
+  margin-left: 6px;
+  font-size: 0.7rem;
+}
+
 .special-cards__empty-slot {
   width: 72px;
   height: 80px;

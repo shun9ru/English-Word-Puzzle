@@ -804,6 +804,37 @@
   text-align: right;
 }
 
+/* --- ステータスエフェクトアイコン --- */
+.game-header__statuses {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+.game-header__status {
+  font-size: 0.65rem;
+  font-weight: bold;
+  padding: 1px 3px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.game-header__status--shield {
+  color: #1565c0;
+  background: rgba(21, 101, 192, 0.12);
+}
+
+.game-header__status--poison {
+  color: #2e7d32;
+  background: rgba(46, 125, 50, 0.12);
+}
+
+.game-header__status--mirror {
+  color: #6a1b9a;
+  background: rgba(106, 27, 154, 0.12);
+}
+
 /* --- HP結果画面 --- */
 .result-screen__hp-display {
   display: flex;

@@ -153,6 +153,12 @@
   text-align: center;
 }
 
+.gacha-screen__card-copies {
+  font-size: 0.65rem;
+  color: #6a1b9a;
+  font-weight: bold;
+}
+
 .gacha-screen__card--levelup {
   background: #fff8e1;
 }

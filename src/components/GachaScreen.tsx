@@ -24,6 +24,8 @@ interface GachaResult {
   card: SpecialCard;
   isLevelUp: boolean;
   newLevel: number;
+  copies: number;
+  copiesNeeded: number;
 }
 
 interface GachaScreenProps {
@@ -59,8 +61,8 @@ export function GachaScreen({ userId, onBack }: GachaScreenProps) {
       await updateGachaPoints(userId, newPoints);
 
       const card = pullGachaWithBanner(activeBanner);
-      const { isLevelUp, newLevel } = await addToCollectionDB(userId, card);
-      setResults([{ card, isLevelUp, newLevel }]);
+      const result = await addToCollectionDB(userId, card);
+      setResults([{ card, ...result }]);
     } catch (e) {
       console.error("ガチャエラー:", e);
       setError("保存に失敗しました。接続を確認してください。");
@@ -81,8 +83,8 @@ export function GachaScreen({ userId, onBack }: GachaScreenProps) {
       const cards = pullGacha10WithBanner(activeBanner);
       const gachaResults: GachaResult[] = [];
       for (const card of cards) {
-        const { isLevelUp, newLevel } = await addToCollectionDB(userId, card);
-        gachaResults.push({ card, isLevelUp, newLevel });
+        const result = await addToCollectionDB(userId, card);
+        gachaResults.push({ card, ...result });
       }
       setResults(gachaResults);
     } catch (e) {
@@ -183,8 +185,10 @@ export function GachaScreen({ userId, onBack }: GachaScreenProps) {
                 </span>
                 {r.isLevelUp ? (
                   <span className="gacha-screen__levelup-badge">Lv.{r.newLevel} UP!</span>
+                ) : r.newLevel < 5 ? (
+                  <span className="gacha-screen__card-copies">{r.copies}/{r.copiesNeeded}</span>
                 ) : (
-                  <span className="gacha-screen__card-desc">{r.card.description}</span>
+                  <span className="gacha-screen__card-desc">MAX</span>
                 )}
               </div>
             ))}
